@@ -103,16 +103,40 @@ function DashboardPage() {
 
         <section className="mt-12">
           <h2 className="text-xl font-extrabold tracking-tight text-ink">System Health Scores</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select a system to see the biomarkers behind its score.
+          </p>
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
             {results.isPending
               ? Array.from({ length: 8 }).map((_, i) => (
                   <Skeleton key={i} className="h-52 rounded-xl" />
                 ))
               : scores.map((s) => (
-                  <ArcDial key={s.system.id} score={s.score} label={s.system.name} />
+                  <ArcDial
+                    key={s.system.id}
+                    score={s.score}
+                    label={s.system.name}
+                    count={s.count}
+                    active={openSystem === s.system.id}
+                    onClick={
+                      s.contributions.length
+                        ? () =>
+                            setOpenSystem((cur) => (cur === s.system.id ? null : s.system.id))
+                        : undefined
+                    }
+                  />
                 ))}
           </div>
+
+          {openDetail && (
+            <SystemDetail
+              detail={openDetail}
+              defs={definitions.data ?? new Map()}
+              onClose={() => setOpenSystem(null)}
+            />
+          )}
         </section>
+
 
         {patient && (
           <section className="mt-12">
