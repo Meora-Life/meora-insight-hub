@@ -316,14 +316,11 @@ function AiSummaryPanel({
   const [open, setOpen] = useState(false);
   const generate = useServerFn(generateHealthSummary);
 
+  // Send the full selected submission — flagged and normal — so Claude has full context.
   const flagged = useMemo(
     () =>
       results
-        .filter((r) => {
-          const s = statuses.get(r.result_id);
-          return s === "out_of_range" || s === "abnormal" || s === "suboptimal";
-        })
-        .slice(0, 60)
+        .slice(0, 250)
         .map((r) => ({
           test_name: r.test_name,
           category: r.category,
