@@ -80,6 +80,7 @@ function salvageTests(text: string): ExtractedTest[] {
           unit: obj.unit ?? null,
           reference_range: obj.reference_range ?? null,
           lab_flag: obj.lab_flag ?? null,
+          date: obj.date ?? null,
         });
       }
     } catch {
