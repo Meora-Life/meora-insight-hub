@@ -276,9 +276,9 @@ function HeroCard({
   const delta = bioAge.delta;
 
   return (
-    <div className="mt-8 overflow-hidden rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
+    <div className="mt-8 rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
       {risk === "exclusion" && (
-        <div className="bg-outofrange px-8 py-4 text-sm font-semibold text-white">
+        <div className="rounded-t-xl bg-outofrange px-8 py-4 text-sm font-semibold text-white">
           {"Exclusion — "}
           <span className="font-medium">{riskReason(patient.notes)}</span>
           <span className="mt-1 block font-medium">
@@ -312,7 +312,7 @@ function HeroCard({
             </div>
             <div
               role="tooltip"
-              className="pointer-events-none absolute left-1/2 top-full z-20 mt-3 w-72 -translate-x-1/2 rounded-xl bg-card p-4 text-left text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              className="pointer-events-none absolute left-1/2 bottom-full z-20 mb-3 w-80 max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl bg-card p-4 text-left text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
             >
               {BIO_AGE_TOOLTIP}
               {bioAge.missing.length > 0 && bioAge.source === "derived" && (
@@ -321,6 +321,7 @@ function HeroCard({
                   {bioAge.missing.join(", ")}.
                 </span>
               )}
+              <span className="absolute left-1/2 top-full -translate-x-1/2 border-4 border-solid border-transparent border-t-card" />
             </div>
           </div>
           <div
