@@ -380,7 +380,22 @@ function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "l
   });
 }
 
-export function recommendedProtocols(patient: Patient, results: FlatResult[]): Protocol[] {
+/** Keeps only the most recent result for each test, so stale panels don't drive protocols. */
+export function latestPerTest(results: FlatResult[]): FlatResult[] {
+  const map = new Map<string, FlatResult>();
+  for (const r of results) {
+    const key = definitionKey(r.category, r.test_name);
+    const prev = map.get(key);
+    if (!prev || (r.date_collected ?? "") > (prev.date_collected ?? "")) map.set(key, r);
+  }
+  return [...map.values()];
+}
+
+function describe(r: FlatResult, word: string): string {
+  return `${r.test_name} is ${word} at ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim();
+}
+
+export function recommendedProtocols(patient: Patient, allResults: FlatResult[]): Protocol[] {
   const risk = riskLevel(patient.notes);
   if (risk === "exclusion") {
     return [
@@ -393,7 +408,9 @@ export function recommendedProtocols(patient: Patient, results: FlatResult[]): P
     ];
   }
 
+  const results = latestPerTest(allResults);
   const protocols: Protocol[] = [];
+
 
   if (risk === "high_risk") {
     protocols.push({
