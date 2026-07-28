@@ -52,8 +52,15 @@ function UnlockPage() {
         <div className="flex justify-center">
           <Logomark size={56} />
         </div>
-        <h1 className="mt-6 font-display text-4xl font-semibold tracking-tight text-ink">MeorAI</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Personalised longevity intelligence.</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          powered by MeorAI
+        </p>
+        <h1 className="mt-2 font-display text-5xl font-semibold tracking-tight text-ink">
+          Meor<span className="text-primary">AI</span>
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Full Spectrum Personalised Human Health Intelligence and Optimisation
+        </p>
 
         <form onSubmit={onSubmit} className="mt-9 space-y-3">
           <input
