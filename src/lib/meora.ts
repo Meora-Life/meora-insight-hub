@@ -1,4 +1,13 @@
 import type { FlatResult, Patient, StatusInfo, StatusKey, TestDefinition } from "./types";
+import {
+  clinicalNotes,
+  describeMedication,
+  domainFor,
+  isActiveStatus,
+  parseTreatmentPlan,
+  type TreatmentDomain,
+  type TreatmentMedication,
+} from "./treatment";
 
 /* ------------------------------------------------------------------ */
 /* Patient helpers                                                     */
@@ -11,22 +20,24 @@ export function patientName(p: Patient): string {
 export type RiskLevel = "exclusion" | "high_risk" | "none";
 
 export function riskLevel(notes: string | null): RiskLevel {
-  const n = (notes ?? "").toUpperCase();
+  const n = (clinicalNotes(notes) ?? "").toUpperCase();
   if (n.includes("EXCLUSION")) return "exclusion";
   if (n.includes("HIGH RISK")) return "high_risk";
   return "none";
 }
 
 export function isSynthetic(notes: string | null): boolean {
-  return (notes ?? "").toUpperCase().includes("SYNTHETIC");
+  return (clinicalNotes(notes) ?? "").toUpperCase().includes("SYNTHETIC");
 }
 
 /** Extracts the clinical reason that follows the EXCLUSION / HIGH RISK marker. */
 export function riskReason(notes: string | null): string {
-  if (!notes) return "";
-  const match = notes.match(/(EXCLUSION|HIGH RISK)\s*:?\s*(.*)$/is);
-  return match ? match[2].trim() : notes.trim();
+  const source = clinicalNotes(notes);
+  if (!source) return "";
+  const match = source.match(/(EXCLUSION|HIGH RISK)\s*:?\s*(.*)$/is);
+  return match ? match[2].trim() : source.trim();
 }
+
 
 export function chronologicalAge(dob: string | null, at?: string | null): number | null {
   if (!dob) return null;
@@ -365,11 +376,17 @@ export function wearablesFor(patient: Patient): Wearables {
 
 export type Urgency = "Recommended" | "Priority" | "Urgent";
 
+export type ProtocolAction = "Initiate" | "Continue" | "Adjust" | "Review" | "Refer";
+
 export interface Protocol {
   name: string;
   rationale: string;
   urgency: Urgency;
   tone: "green" | "amber" | "red" | "neutral";
+  /** What the system is advising against the current treatment plan. */
+  action?: ProtocolAction;
+  /** Supporting lines, e.g. the medications a patient is currently on. */
+  details?: string[];
 }
 
 function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "low") {
@@ -379,6 +396,86 @@ function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "l
     return needles.some((n) => name.includes(n));
   });
 }
+
+function markerLabel(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Turns an active treatment plan into "Continue / Adjust" protocols and reports
+ * which initiate-style protocols it supersedes.
+ */
+function treatmentPlanProtocols(
+  patient: Patient,
+  results: FlatResult[],
+): { planProtocols: Protocol[]; superseded: Set<string> } {
+  const plan = parseTreatmentPlan(patient.notes);
+  const superseded = new Set<string>();
+  if (!plan) return { planProtocols: [], superseded };
+
+  const active = plan.medications.filter((m) => m.name.trim() && isActiveStatus(m.status));
+  if (active.length === 0) return { planProtocols: [], superseded };
+
+  const groups = new Map<string, { domain?: TreatmentDomain; meds: TreatmentMedication[] }>();
+  for (const med of active) {
+    const domain = domainFor(med.name);
+    const key = domain?.label ?? med.name.trim().toLowerCase();
+    const group = groups.get(key) ?? { domain, meds: [] };
+    group.meds.push(med);
+    groups.set(key, group);
+  }
+
+  const planProtocols: Protocol[] = [];
+  for (const [key, group] of groups) {
+    const label = group.domain?.label ?? group.meds[0].name.trim();
+    group.domain?.supersedes.forEach((n) => superseded.add(n));
+
+    const markers = group.domain?.markers ?? [];
+    const flagged = results.filter((r) => {
+      const flag = (r.flag ?? "").toLowerCase();
+      if (!["high", "low", "abnormal"].includes(flag)) return false;
+      const name = r.test_name.toLowerCase();
+      return markers.some((m) => name.includes(m));
+    });
+
+    const reviewNames = markers.length
+      ? markerLabel(
+          markers
+            .filter((m) => !["hematocrit", "estradiol"].includes(m))
+            .map((m) => (m === "shbg" ? "SHBG" : m)),
+        )
+      : "";
+
+    const rationale = [
+      markers.length
+        ? `Review ${reviewNames} on the next blood panel to confirm dosing is optimised.`
+        : "Review response and tolerance at the next consultation.",
+      flagged.length
+        ? `Latest panel flags ${flagged
+            .slice(0, 3)
+            .map((r) => `${r.test_name} ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim())
+            .join("; ")} — dose review advised before the next cycle.`
+        : "Latest results support continuing at the current dose.",
+    ].join(" ");
+
+    const details = group.meds.map(describeMedication);
+    if (plan.add_ons.trim()) details.push(`Add-on: ${plan.add_ons.trim()}`);
+
+    planProtocols.push({
+      name: `Continue current ${label} protocol`,
+      rationale,
+      urgency: flagged.length ? "Priority" : "Recommended",
+      tone: flagged.length ? "amber" : "green",
+      action: flagged.length ? "Adjust" : "Continue",
+      details,
+    });
+    void key;
+  }
+
+  return { planProtocols, superseded };
+}
+
 
 /** Keeps only the most recent result for each test, so stale panels don't drive protocols. */
 export function latestPerTest(results: FlatResult[]): FlatResult[] {
@@ -572,14 +669,25 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
+  const { planProtocols, superseded } = treatmentPlanProtocols(patient, results);
+  if (planProtocols.length) {
+    const kept = protocols.filter(
+      (p) => !superseded.has(p.name) && p.name !== "Maintenance Protocol",
+    );
+    return [...planProtocols, ...kept];
+  }
+
   if (protocols.length === 0) {
     protocols.push({
       name: "Maintenance Protocol",
       rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
       urgency: "Recommended",
       tone: "green",
+      action: "Initiate",
     });
   }
+
+
 
 
   return protocols;
