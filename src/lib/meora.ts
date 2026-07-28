@@ -407,13 +407,31 @@ export function markerDirection(r: FlatResult): "high" | "low" | null {
   return null;
 }
 
+/**
+ * Direction used to trigger protocols. Trusts the reporting lab: when a lab has
+ * explicitly called a marker normal we do not escalate a marginal deviation from
+ * the longevity-optimal window into a protocol. Reports without flags (some
+ * uploads) still fall back to the optimal-range comparison.
+ */
+export function protocolDirection(r: FlatResult): "high" | "low" | null {
+  const flag = (r.flag ?? "").trim().toLowerCase();
+  if (flag === "high" || flag === "low") return flag;
+  if (flag) return null;
+  return markerDirection(r);
+}
+
 function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "low") {
   return results.find((r) => {
-    if (markerDirection(r) !== flag) return false;
+    if (protocolDirection(r) !== flag) return false;
     const name = r.test_name.toLowerCase();
     return needles.some((n) => name.includes(n));
   });
 }
+
+function isFemale(patient: Patient): boolean {
+  return (patient.sex ?? "").trim().toUpperCase().startsWith("F");
+}
+
 
 interface CompositeTrigger {
   needles: string[];
