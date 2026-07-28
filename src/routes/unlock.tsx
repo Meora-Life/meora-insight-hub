@@ -48,23 +48,25 @@ function UnlockPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6">
-      <div className={`w-full max-w-lg text-center ${shake ? "animate-shake" : ""}`}>
+      <div
+        className={`flex w-full max-w-xl flex-col items-center text-center ${shake ? "animate-shake" : ""}`}
+      >
         <img
           src={meoraLifeLogo.url}
           alt="Meora.life"
-          className="mx-auto h-20 w-auto"
+          className="h-28 w-auto"
         />
-        <p className="mt-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           powered by
         </p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+        <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink">
           Meor<span className="text-primary">AI</span>
         </h1>
-        <p className="mt-2 whitespace-nowrap text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">
+        <p className="mt-2 whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
           Full Spectrum Personalised Human Health Intelligence and Optimisation
         </p>
 
-        <form onSubmit={onSubmit} className="mt-9 space-y-3">
+        <form onSubmit={onSubmit} className="mt-10 w-full max-w-sm space-y-3">
           <input
             type="password"
             name="password"
