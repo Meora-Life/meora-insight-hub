@@ -473,26 +473,6 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="font-semibold text-foreground">{value}</dd>
-    </div>
-  );
-}
-
-function Badge({ tone, children }: { tone: "red" | "amber" | "grey"; children: React.ReactNode }) {
-  const cls =
-    tone === "red"
-      ? "bg-outofrange-soft text-outofrange"
-      : tone === "amber"
-        ? "bg-suboptimal-soft text-suboptimal"
-        : "bg-muted text-muted-foreground";
-  return (
-    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>{children}</span>
-  );
-}
 
 function ParseProgress({ stage }: { stage: Exclude<ParseStage, null> }) {
   const activeIndex = STAGE_STEPS.findIndex((s) => s.id === stage);
