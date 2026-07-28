@@ -184,14 +184,14 @@ function HeroCard({
   loading: boolean;
 }) {
   const risk = riskLevel(patient.notes);
-  const bioRow = rows.find((r) => r.test_name.toLowerCase().includes("biological age"));
   const lastDate = rows.reduce<string | null>(
     (acc, r) => (r.date_collected && (!acc || r.date_collected > acc) ? r.date_collected : acc),
     null,
   );
-  const chrono = chronologicalAge(patient.date_of_birth, lastDate);
-  const bio = bioRow ? numericValue(bioRow.result_value) : null;
-  const delta = chrono !== null && bio !== null ? Math.round(bio - chrono) : null;
+  const bioAge = biologicalAge(patient, rows);
+  const chrono = bioAge.chronoAge;
+  const bio = bioAge.bioAge;
+  const delta = bioAge.delta;
 
   return (
     <div className="mt-8 overflow-hidden rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
@@ -213,15 +213,38 @@ function HeroCard({
           </div>
           <div className="mt-4 space-y-1 text-sm text-ink-foreground/70">
             <div>Chronological age: {chrono !== null ? `${chrono}` : "—"}</div>
-            <div>Biological age: {bio !== null ? `${bio}` : "Not measured"}</div>
+            <div>
+              Biological age: {bio !== null ? `${bio}` : "Not measured"}
+              {bio !== null && bioAge.source === "derived" && " (derived)"}
+            </div>
           </div>
         </div>
 
         <div className="text-center">
-          <div className="text-[4rem] font-extrabold leading-none tabular-nums">
-            {loading ? "…" : bio !== null ? bio : "—"}
+          <div className="group relative inline-block">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[4rem] font-extrabold leading-none tabular-nums">
+                {loading ? "…" : bio !== null ? bio : "—"}
+              </span>
+              <Info className="h-4 w-4 text-ink-foreground/50" aria-hidden="true" />
+            </div>
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute left-1/2 top-full z-20 mt-3 w-72 -translate-x-1/2 rounded-xl bg-card p-4 text-left text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {BIO_AGE_TOOLTIP}
+              {bioAge.missing.length > 0 && bioAge.source === "derived" && (
+                <span className="mt-2 block text-muted-foreground">
+                  Not available in this patient&apos;s panels (population median assumed):{" "}
+                  {bioAge.missing.join(", ")}.
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-1 text-xs uppercase tracking-wide text-ink-foreground/60">
+          <div
+            className="mt-1 text-xs uppercase tracking-wide text-ink-foreground/60"
+            tabIndex={0}
+          >
             Biological age
           </div>
           {delta !== null && (
@@ -237,6 +260,7 @@ function HeroCard({
             </span>
           )}
         </div>
+
 
         <div className="space-y-2 text-sm md:text-right">
           <HeroStat label="Last test" value={formatDate(lastDate)} />
