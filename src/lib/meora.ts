@@ -389,13 +389,132 @@ export interface Protocol {
   details?: string[];
 }
 
+/**
+ * Direction a marker sits away from its optimal window.
+ * Uses the lab flag when present, otherwise compares the value to the optimal
+ * range so uploaded reports (which often carry no lab flag) still trigger rules.
+ */
+export function markerDirection(r: FlatResult): "high" | "low" | null {
+  const flag = (r.flag ?? "").toLowerCase();
+  if (flag === "high" || flag === "low") return flag;
+  if (["abnormal", "not_detected", "below_detection_limit"].includes(flag)) return null;
+  const value = numericValue(r.result_value);
+  if (value === null) return null;
+  const low = r.optimal_low;
+  const high = r.optimal_high;
+  if (low !== null && value < low) return "low";
+  if (high !== null && value > high) return "high";
+  return null;
+}
+
 function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "low") {
   return results.find((r) => {
-    if ((r.flag ?? "").toLowerCase() !== flag) return false;
+    if (markerDirection(r) !== flag) return false;
     const name = r.test_name.toLowerCase();
     return needles.some((n) => name.includes(n));
   });
 }
+
+interface CompositeTrigger {
+  needles: string[];
+  direction: "high" | "low";
+}
+
+interface CompositeRule {
+  name: string;
+  urgency: Urgency;
+  tone: Protocol["tone"];
+  minHits: number;
+  supersedes: string[];
+  triggers: CompositeTrigger[];
+  note: string;
+}
+
+const COMPOSITE_RULES: CompositeRule[] = [
+  {
+    name: "Performance + Recovery",
+    urgency: "Priority",
+    tone: "amber",
+    minHits: 2,
+    supersedes: ["Anti-Inflammatory Protocol", "Metabolic Reset Protocol"],
+    note: "Inflammation, fatty acid status and glucose handling are limiting recovery and training adaptation.",
+    triggers: [
+      { needles: ["crp", "c-reactive"], direction: "high" },
+      { needles: ["omega-3", "omega 3", "epa", "dha"], direction: "low" },
+      { needles: ["insulin", "hba1c", "glucose", "homa"], direction: "high" },
+      { needles: ["triglyceride"], direction: "high" },
+    ],
+  },
+  {
+    name: "Men's TRT Evaluation",
+    urgency: "Priority",
+    tone: "amber",
+    minHits: 1,
+    supersedes: ["TRT Evaluation"],
+    note: "Androgen status sits below optimal — confirm with a repeat morning panel before considering therapy.",
+    triggers: [
+      { needles: ["testosterone"], direction: "low" },
+      { needles: ["free androgen", "fai"], direction: "low" },
+      { needles: ["shbg", "sex hormone binding"], direction: "high" },
+      { needles: ["lh", "luteinising hormone"], direction: "low" },
+    ],
+  },
+  {
+    name: "Longevity",
+    urgency: "Recommended",
+    tone: "neutral",
+    minHits: 2,
+    supersedes: [
+      "Methylation Support Protocol",
+      "Nutraceutical Support — Vitamin D",
+      "Iron Repletion Protocol",
+    ],
+    note: "Methylation, micronutrient and iron status all influence long-term healthspan trajectory.",
+    triggers: [
+      { needles: ["homocysteine"], direction: "high" },
+      { needles: ["vitamin d", "25-oh", "25 oh"], direction: "low" },
+      { needles: ["ferritin"], direction: "low" },
+      { needles: ["b12", "folate"], direction: "low" },
+    ],
+  },
+];
+
+function compositeProtocols(results: FlatResult[]): {
+  protocols: Protocol[];
+  superseded: Set<string>;
+} {
+  const protocols: Protocol[] = [];
+  const superseded = new Set<string>();
+
+  for (const rule of COMPOSITE_RULES) {
+    const hits: FlatResult[] = [];
+    for (const trigger of rule.triggers) {
+      const hit = findFlagged(results, trigger.needles, trigger.direction);
+      if (hit && !hits.includes(hit)) hits.push(hit);
+    }
+    if (hits.length < rule.minHits) continue;
+    rule.supersedes.forEach((n) => superseded.add(n));
+    protocols.push({
+      name: rule.name,
+      urgency: rule.urgency,
+      tone: rule.tone,
+      rationale: `${rule.note} Drivers: ${hits
+        .map(
+          (r) =>
+            `${r.test_name} ${markerDirection(r) === "high" ? "elevated" : "low"} at ${
+              r.result_value ?? "—"
+            } ${r.unit ?? ""}`.trim(),
+        )
+        .join("; ")}.`,
+      details: hits.map(
+        (r) => `${r.test_name}: ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim(),
+      ),
+    });
+  }
+
+  return { protocols, superseded };
+}
+
 
 function markerLabel(names: string[]): string {
   if (names.length <= 1) return names[0] ?? "";
