@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
-import { Logomark } from "@/components/site-chrome";
+import meoraLifeLogo from "@/assets/meora-life-logo.png.asset.json";
 import { unlockSite } from "@/lib/gate.functions";
 
 export const Route = createFileRoute("/unlock")({
@@ -49,13 +49,15 @@ function UnlockPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-6">
       <div className={`w-full max-w-sm text-center ${shake ? "animate-shake" : ""}`}>
-        <div className="flex justify-center">
-          <Logomark size={56} />
-        </div>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          powered by MeorAI
+        <img
+          src={meoraLifeLogo.url}
+          alt="Meora.life"
+          className="mx-auto h-8 w-auto"
+        />
+        <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          powered by
         </p>
-        <h1 className="mt-2 font-display text-5xl font-semibold tracking-tight text-ink">
+        <h1 className="mt-1 font-display text-5xl font-semibold tracking-tight text-ink">
           Meor<span className="text-primary">AI</span>
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
