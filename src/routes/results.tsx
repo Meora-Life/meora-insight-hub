@@ -213,7 +213,7 @@ function ResultsPage() {
 
         <AiSummaryPanel
           patientLabel={patient ? patientName(patient) : null}
-          results={results.data ?? []}
+          results={visible}
           statuses={statuses}
         />
 
