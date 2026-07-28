@@ -136,18 +136,37 @@ function HomePage() {
       if (method === "pdf" && !pdfFile) throw new Error("Select a PDF pathology report first.");
 
       setStage("patient");
-      const existingPatients = (patients.data ?? []).map((p) => p.patient_id);
-      const patientId = nextId("PAT", existingPatients);
 
-      const { error: patientError } = await supabase.from("patients").insert({
-        patient_id: patientId,
-        first_name: form.first_name.trim(),
-        last_name: form.last_name.trim(),
-        date_of_birth: form.date_of_birth || null,
-        sex: form.sex,
-        notes: "Created via MeorAI upload",
-      });
-      if (patientError) throw new Error(patientError.message);
+      const firstName = form.first_name.trim();
+      const lastName = form.last_name.trim();
+      const dob = form.date_of_birth || null;
+
+      // Reuse an existing patient with the same name + DOB instead of duplicating.
+      let matchQuery = supabase
+        .from("patients")
+        .select("patient_id")
+        .ilike("first_name", firstName)
+        .ilike("last_name", lastName);
+      matchQuery = dob ? matchQuery.eq("date_of_birth", dob) : matchQuery.is("date_of_birth", null);
+      const { data: existingMatch, error: matchError } = await matchQuery.limit(1);
+      if (matchError) throw new Error(matchError.message);
+
+      let patientId = (existingMatch?.[0] as { patient_id?: string } | undefined)?.patient_id ?? "";
+
+      if (!patientId) {
+        const existingPatients = (patients.data ?? []).map((p) => p.patient_id);
+        patientId = nextId("PAT", existingPatients);
+
+        const { error: patientError } = await supabase.from("patients").insert({
+          patient_id: patientId,
+          first_name: firstName,
+          last_name: lastName,
+          date_of_birth: dob,
+          sex: form.sex,
+          notes: "Created via MeorAI upload",
+        });
+        if (patientError) throw new Error(patientError.message);
+      }
 
       if (method === "pdf" && pdfFile) {
         setStage("extracting");
