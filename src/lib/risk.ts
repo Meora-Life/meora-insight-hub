@@ -118,9 +118,16 @@ export function resultRiskFindings(results: FlatResult[]): RiskFinding[] {
       push("Pregnancy / hCG", `${display(r)} is above the reference range`);
     }
 
-    if ((n.includes("prostate specific") || n.includes("psa")) && (isHigh(r) || (value !== null && value > 4.0))) {
+    // Only the total PSA concentration carries the >4.0 ug/L threshold; free PSA
+    // and the free/total ratio are reported on different scales.
+    const isTotalPsa =
+      (n.includes("psa") || n.includes("prostate specific")) &&
+      !n.includes("free") &&
+      !n.includes("ratio");
+    if (isTotalPsa && (isHigh(r) || (value !== null && value > 4.0))) {
       push("Prostate", `${display(r)} is elevated (>4.0 ug/L or lab-flagged high)`);
     }
+
 
     if (n.includes("egfr") && value !== null && value < 30) {
       push("Renal", `${display(r)} indicates severely reduced kidney function (eGFR < 30)`);
