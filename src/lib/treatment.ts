@@ -127,7 +127,7 @@ export const TREATMENT_DOMAINS: TreatmentDomain[] = [
     label: "TRT",
     keywords: ["testosterone", "primoteston", "sustanon", "nebido", "enanthate", "cypionate", "trt"],
     markers: ["testosterone", "shbg", "haematocrit", "hematocrit", "oestradiol", "estradiol"],
-    supersedes: ["TRT Evaluation"],
+    supersedes: ["TRT Evaluation", "Men's TRT Evaluation"],
   },
   {
     label: "thyroid",
@@ -139,13 +139,13 @@ export const TREATMENT_DOMAINS: TreatmentDomain[] = [
     label: "vitamin D",
     keywords: ["vitamin d", "cholecalciferol", "ostelin"],
     markers: ["vitamin d", "25-oh", "calcium"],
-    supersedes: ["Nutraceutical Support — Vitamin D"],
+    supersedes: ["Nutraceutical Support — Vitamin D", "Longevity"],
   },
   {
     label: "iron repletion",
     keywords: ["ferro", "iron", "maltofer", "ferrous"],
     markers: ["ferritin", "iron", "transferrin saturation", "haemoglobin"],
-    supersedes: ["Iron Repletion Protocol"],
+    supersedes: ["Iron Repletion Protocol", "Longevity"],
   },
   {
     label: "lipid",
@@ -157,7 +157,7 @@ export const TREATMENT_DOMAINS: TreatmentDomain[] = [
     label: "metabolic",
     keywords: ["metformin", "semaglutide", "ozempic", "tirzepatide", "mounjaro", "glp"],
     markers: ["glucose", "hba1c", "insulin"],
-    supersedes: ["Metabolic Reset Protocol"],
+    supersedes: ["Metabolic Reset Protocol", "Performance + Recovery"],
   },
 ];
 

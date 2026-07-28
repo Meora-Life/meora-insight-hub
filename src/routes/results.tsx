@@ -316,14 +316,11 @@ function AiSummaryPanel({
   const [open, setOpen] = useState(false);
   const generate = useServerFn(generateHealthSummary);
 
+  // Send the full selected submission — flagged and normal — so Claude has full context.
   const flagged = useMemo(
     () =>
       results
-        .filter((r) => {
-          const s = statuses.get(r.result_id);
-          return s === "out_of_range" || s === "abnormal" || s === "suboptimal";
-        })
-        .slice(0, 60)
+        .slice(0, 250)
         .map((r) => ({
           test_name: r.test_name,
           category: r.category,
@@ -374,7 +371,7 @@ function AiSummaryPanel({
           {summary.isPending && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Analysing {flagged.length} flagged biomarkers…
+              Analysing {flagged.length} biomarkers…
             </div>
           )}
           {summary.isError && (

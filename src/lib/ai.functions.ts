@@ -16,7 +16,7 @@ const SummaryInput = z.object({
         status: z.string().max(60),
       }),
     )
-    .max(120),
+    .max(250),
 });
 
 export const generateHealthSummary = createServerFn({ method: "POST" })

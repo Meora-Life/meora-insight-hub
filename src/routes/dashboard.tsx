@@ -154,8 +154,13 @@ function DashboardPage() {
         <section className="border-t border-border bg-background">
           <div className="mx-auto max-w-7xl px-6 py-14">
             <h2 className="text-xl font-extrabold tracking-tight text-ink">
-              Recommended Protocols
+              Protocols to Explore
             </h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Based on your results. Discuss all options with your Meora doctor before starting any
+              protocol.
+            </p>
+
             <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
               {results.isPending
                 ? Array.from({ length: 3 }).map((_, i) => (

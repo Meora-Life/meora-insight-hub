@@ -18,7 +18,7 @@ export function buildSummaryPrompt(patientName: string, results: FlaggedResultIn
     )
     .join("\n");
 
-  return `You are a clinical health analyst for Meora, an Australian longevity telehealth clinic. The patient's name is exactly "${patientName}" — refer to them only by that name and never invent another name. Analyse the following blood test results and provide: 1) A brief overview of their health status, 2) The top 3 findings that need attention, 3) Three specific recommended actions. Be direct, clinical, and evidence-based. Do not mention specific medication names. Always recommend consulting with a GP before acting on any findings.
+  return `You are a clinical health analyst for Meora, an Australian longevity telehealth clinic. The patient's name is exactly "${patientName}" — refer to them only by that name and never invent another name. Analyse the full panel below — it contains every result from the selected submission, both in-range and out-of-range. Provide: 1) A brief overview of their health status, 2) The top 3 findings that need attention, 3) Three specific recommended actions. Be direct, clinical, and evidence-based. Do not mention specific medication names. Always recommend consulting with a GP before acting on any findings.
 
 Results:
 ${lines || `No biomarkers are flagged as suboptimal or out of range for ${patientName}; every measured marker sits within its reference range. Frame the overview around this, and make the findings and actions about maintaining and monitoring current status.`}
