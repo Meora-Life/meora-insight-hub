@@ -36,7 +36,7 @@ export function buildParsePrompt(knownTests: string[], reportText: string): stri
   return `You are a pathology report parser. Extract every test result from the report text below.
 
 Return ONLY a JSON object, no prose and no markdown fences, in exactly this shape:
-{"lab_name": string|null, "report_type": string|null, "date_collected": "YYYY-MM-DD"|null, "tests": [{"test_name": string, "value": string, "unit": string|null, "reference_range": string|null, "lab_flag": "normal"|"high"|"low"|"abnormal"|null}]}
+{"lab_name": string|null, "report_type": string|null, "date_collected": "YYYY-MM-DD"|null, "tests": [{"test_name": string, "value": string, "unit": string|null, "reference_range": string|null, "lab_flag": "normal"|"high"|"low"|"abnormal"|"not_detected"|"below_detection_limit"|null}]}
 
 Rules:
 - Use the test names from this known list wherever the report refers to the same analyte (match synonyms and abbreviations to the list entry): ${knownTests.join(", ")}.
