@@ -1,10 +1,12 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import Papa from "papaparse";
 import { PageShell } from "@/components/site-chrome";
 import { Skeleton } from "@/components/ui-bits";
 import { isUnlocked } from "@/lib/gate.functions";
+import { parsePdfReport } from "@/lib/parse.functions";
 import {
   patientSummariesQuery,
   patientsQuery,
@@ -40,6 +42,24 @@ export const Route = createFileRoute("/")({
 
 type UploadMethod = "pdf" | "csv" | "manual";
 
+type ParseStage = null | "patient" | "extracting" | "analysing" | "saving";
+
+const STAGE_STEPS: Array<{ id: Exclude<ParseStage, null>; label: string }> = [
+  { id: "patient", label: "Creating patient record" },
+  { id: "extracting", label: "Extracting text from PDF" },
+  { id: "analysing", label: "Identifying tests and values with Claude" },
+  { id: "saving", label: "Matching biomarkers and saving results" },
+];
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < buffer.length; i += 8192) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
 interface NewPatientForm {
   first_name: string;
   last_name: string;
@@ -70,10 +90,15 @@ function HomePage() {
   });
   const [method, setMethod] = useState<UploadMethod>("pdf");
   const [fileName, setFileName] = useState<string>("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pasted, setPasted] = useState("");
+  const [stage, setStage] = useState<ParseStage>(null);
   const [csvMatches, setCsvMatches] = useState<{ matched: string[]; unmatched: string[] } | null>(
     null,
   );
+
+  const navigate = useNavigate();
+  const parsePdf = useServerFn(parsePdfReport);
 
   const definitionNames = useMemo(() => {
     const names = new Set<string>();
@@ -102,6 +127,9 @@ function HomePage() {
 
   const createPatient = useMutation({
     mutationFn: async (): Promise<string> => {
+      if (method === "pdf" && !pdfFile) throw new Error("Select a PDF pathology report first.");
+
+      setStage("patient");
       const existingPatients = (patients.data ?? []).map((p) => p.patient_id);
       const patientId = nextId("PAT", existingPatients);
 
@@ -114,6 +142,18 @@ function HomePage() {
         notes: "Created via MeorAI upload",
       });
       if (patientError) throw new Error(patientError.message);
+
+      if (method === "pdf" && pdfFile) {
+        setStage("extracting");
+        const file_base64 = await fileToBase64(pdfFile);
+        setStage("analysing");
+        const result = await parsePdf({
+          data: { patient_id: patientId, file_name: pdfFile.name, file_base64 },
+        });
+        setStage("saving");
+        void result;
+        return patientId;
+      }
 
       const { data: subs, error: subsError } = await supabase
         .from("report_submissions")
@@ -137,9 +177,14 @@ function HomePage() {
 
       return patientId;
     },
-    onSuccess: () => {
+    onError: () => setStage(null),
+    onSuccess: (patientId) => {
+      setStage(null);
       void queryClient.invalidateQueries({ queryKey: ["patients"] });
       void queryClient.invalidateQueries({ queryKey: ["patient_summaries"] });
+      void queryClient.invalidateQueries({ queryKey: ["platform_stats"] });
+      void queryClient.invalidateQueries({ queryKey: ["flat_results", patientId] });
+      if (method === "pdf") void navigate({ to: "/results", search: { patient: patientId } });
     },
   });
 
@@ -274,11 +319,16 @@ function HomePage() {
                   <input
                     type="file"
                     accept=".pdf"
-                    onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setPdfFile(file);
+                      setFileName(file?.name ?? "");
+                    }}
                     className={fileInputClass}
                   />
                 </Field>
               )}
+
 
               {method === "csv" && (
                 <div className="space-y-3">
@@ -324,6 +374,8 @@ function HomePage() {
                 </Field>
               )}
 
+              {stage && <ParseProgress stage={stage} />}
+
               {createPatient.isError && (
                 <p className="text-sm font-medium text-outofrange">
                   {createPatient.error instanceof Error
@@ -337,12 +389,14 @@ function HomePage() {
                 disabled={createPatient.isPending}
                 className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {createPatient.isPending ? "Uploading…" : "Upload & Analyse"}
+                {createPatient.isPending ? "Parsing…" : "Upload & Analyse"}
               </button>
               <p className="text-xs text-muted-foreground">
-                Report parsing runs in a later phase. The patient, submission and file reference are
-                stored now.
+                {method === "pdf"
+                  ? "The report is read server-side, interpreted by Claude, matched against the test library and saved to this patient's record."
+                  : "CSV and manual entries store the patient, submission and file reference now."}
               </p>
+
             </form>
           )}
         </div>
@@ -438,6 +492,41 @@ function Badge({ tone, children }: { tone: "red" | "amber" | "grey"; children: R
         : "bg-muted text-muted-foreground";
   return (
     <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${cls}`}>{children}</span>
+  );
+}
+
+function ParseProgress({ stage }: { stage: Exclude<ParseStage, null> }) {
+  const activeIndex = STAGE_STEPS.findIndex((s) => s.id === stage);
+  return (
+    <div className="rounded-xl border border-border bg-muted/60 p-5">
+      <p className="text-sm font-extrabold tracking-tight text-ink">Parsing report</p>
+      <ol className="mt-3 space-y-2">
+        {STAGE_STEPS.map((step, index) => {
+          const done = index < activeIndex;
+          const active = index === activeIndex;
+          return (
+            <li key={step.id} className="flex items-center gap-3 text-sm">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  done ? "bg-optimal" : active ? "animate-pulse bg-primary" : "bg-border"
+                }`}
+              />
+              <span
+                className={
+                  done
+                    ? "text-foreground/70"
+                    : active
+                      ? "font-semibold text-ink"
+                      : "text-muted-foreground"
+                }
+              >
+                {step.label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
