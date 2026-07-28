@@ -74,8 +74,19 @@ export function normaliseName(name: string): string {
     .trim();
 }
 
-/** Numeric flag derived from the definition's reference bounds. */
-export function deriveFlag(value: number | null, def: TestDefRow): string {
+const LAB_FLAGS = new Set([
+  "normal",
+  "high",
+  "low",
+  "abnormal",
+  "not_detected",
+  "below_detection_limit",
+]);
+
+/** Prefer the flag stated on the report; otherwise derive from the definition's bounds. */
+export function deriveFlag(value: number | null, def: TestDefRow, labFlag?: string | null): string {
+  const stated = labFlag?.toLowerCase().trim().replace(/\s+/g, "_");
+  if (stated && LAB_FLAGS.has(stated)) return stated;
   if (value === null) return "normal";
   if (def.range_low !== null && value < def.range_low) return "low";
   if (def.range_high !== null && value > def.range_high) return "high";
