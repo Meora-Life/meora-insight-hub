@@ -374,6 +374,8 @@ function HomePage() {
                 </Field>
               )}
 
+              {stage && <ParseProgress stage={stage} />}
+
               {createPatient.isError && (
                 <p className="text-sm font-medium text-outofrange">
                   {createPatient.error instanceof Error
@@ -387,12 +389,14 @@ function HomePage() {
                 disabled={createPatient.isPending}
                 className="rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
-                {createPatient.isPending ? "Uploading…" : "Upload & Analyse"}
+                {createPatient.isPending ? "Parsing…" : "Upload & Analyse"}
               </button>
               <p className="text-xs text-muted-foreground">
-                Report parsing runs in a later phase. The patient, submission and file reference are
-                stored now.
+                {method === "pdf"
+                  ? "The report is read server-side, interpreted by Claude, matched against the test library and saved to this patient's record."
+                  : "CSV and manual entries store the patient, submission and file reference now."}
               </p>
+
             </form>
           )}
         </div>
