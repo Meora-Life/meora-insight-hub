@@ -496,6 +496,11 @@ function HomePage() {
           </p>
         )}
       </section>
+
+      {planPatient && (
+        <TreatmentPlanEditor patient={planPatient} onClose={() => setPlanPatient(null)} />
+      )}
+
     </PageShell>
   );
 }
