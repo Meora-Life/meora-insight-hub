@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDownRight, ArrowUpRight, Info, X } from "lucide-react";
 import { PageShell } from "@/components/site-chrome";
 import { PatientSelector } from "@/components/patient-selector";
 import { ArcDial } from "@/components/arc-dial";
@@ -14,18 +14,22 @@ import {
   testDefinitionsQuery,
 } from "@/lib/queries";
 import {
-  chronologicalAge,
+  definitionKey,
   formatDate,
-  numericValue,
   patientName,
   recommendedProtocols,
+  resultStatus,
   riskLevel,
   riskReason,
+  statusInfo,
   systemScores,
   wearablesFor,
   type Protocol,
+  type SystemScore,
 } from "@/lib/meora";
-import type { FlatResult, Patient } from "@/lib/types";
+import { BIO_AGE_TOOLTIP, biologicalAge } from "@/lib/bioage";
+import type { FlatResult, Patient, TestDefinition } from "@/lib/types";
+
 
 export const Route = createFileRoute("/dashboard")({
   validateSearch: (search: Record<string, unknown>): { patient?: string } => ({
@@ -67,10 +71,14 @@ function DashboardPage() {
   const patient = patients.data?.find((p) => p.patient_id === selectedId) ?? null;
   const rows = results.data ?? [];
 
+  const [openSystem, setOpenSystem] = useState<string | null>(null);
+
   const scores = useMemo(
     () => systemScores(rows, definitions.data ?? new Map()),
     [rows, definitions.data],
   );
+  const openDetail = scores.find((s) => s.system.id === openSystem) ?? null;
+
 
   return (
     <PageShell>
@@ -99,16 +107,40 @@ function DashboardPage() {
 
         <section className="mt-12">
           <h2 className="text-xl font-extrabold tracking-tight text-ink">System Health Scores</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select a system to see the biomarkers behind its score.
+          </p>
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
             {results.isPending
               ? Array.from({ length: 8 }).map((_, i) => (
                   <Skeleton key={i} className="h-52 rounded-xl" />
                 ))
               : scores.map((s) => (
-                  <ArcDial key={s.system.id} score={s.score} label={s.system.name} />
+                  <ArcDial
+                    key={s.system.id}
+                    score={s.score}
+                    label={s.system.name}
+                    count={s.count}
+                    active={openSystem === s.system.id}
+                    onClick={
+                      s.contributions.length
+                        ? () =>
+                            setOpenSystem((cur) => (cur === s.system.id ? null : s.system.id))
+                        : undefined
+                    }
+                  />
                 ))}
           </div>
+
+          {openDetail && (
+            <SystemDetail
+              detail={openDetail}
+              defs={definitions.data ?? new Map()}
+              onClose={() => setOpenSystem(null)}
+            />
+          )}
         </section>
+
 
         {patient && (
           <section className="mt-12">
@@ -152,14 +184,14 @@ function HeroCard({
   loading: boolean;
 }) {
   const risk = riskLevel(patient.notes);
-  const bioRow = rows.find((r) => r.test_name.toLowerCase().includes("biological age"));
   const lastDate = rows.reduce<string | null>(
     (acc, r) => (r.date_collected && (!acc || r.date_collected > acc) ? r.date_collected : acc),
     null,
   );
-  const chrono = chronologicalAge(patient.date_of_birth, lastDate);
-  const bio = bioRow ? numericValue(bioRow.result_value) : null;
-  const delta = chrono !== null && bio !== null ? Math.round(bio - chrono) : null;
+  const bioAge = biologicalAge(patient, rows);
+  const chrono = bioAge.chronoAge;
+  const bio = bioAge.bioAge;
+  const delta = bioAge.delta;
 
   return (
     <div className="mt-8 overflow-hidden rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
@@ -181,15 +213,38 @@ function HeroCard({
           </div>
           <div className="mt-4 space-y-1 text-sm text-ink-foreground/70">
             <div>Chronological age: {chrono !== null ? `${chrono}` : "—"}</div>
-            <div>Biological age: {bio !== null ? `${bio}` : "Not measured"}</div>
+            <div>
+              Biological age: {bio !== null ? `${bio}` : "Not measured"}
+              {bio !== null && bioAge.source === "derived" && " (derived)"}
+            </div>
           </div>
         </div>
 
         <div className="text-center">
-          <div className="text-[4rem] font-extrabold leading-none tabular-nums">
-            {loading ? "…" : bio !== null ? bio : "—"}
+          <div className="group relative inline-block">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-[4rem] font-extrabold leading-none tabular-nums">
+                {loading ? "…" : bio !== null ? bio : "—"}
+              </span>
+              <Info className="h-4 w-4 text-ink-foreground/50" aria-hidden="true" />
+            </div>
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute left-1/2 top-full z-20 mt-3 w-72 -translate-x-1/2 rounded-xl bg-card p-4 text-left text-xs leading-relaxed text-foreground opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {BIO_AGE_TOOLTIP}
+              {bioAge.missing.length > 0 && bioAge.source === "derived" && (
+                <span className="mt-2 block text-muted-foreground">
+                  Not available in this patient&apos;s panels (population median assumed):{" "}
+                  {bioAge.missing.join(", ")}.
+                </span>
+              )}
+            </div>
           </div>
-          <div className="mt-1 text-xs uppercase tracking-wide text-ink-foreground/60">
+          <div
+            className="mt-1 text-xs uppercase tracking-wide text-ink-foreground/60"
+            tabIndex={0}
+          >
             Biological age
           </div>
           {delta !== null && (
@@ -205,6 +260,7 @@ function HeroCard({
             </span>
           )}
         </div>
+
 
         <div className="space-y-2 text-sm md:text-right">
           <HeroStat label="Last test" value={formatDate(lastDate)} />
@@ -283,6 +339,97 @@ function ProtocolCard({ protocol }: { protocol: Protocol }) {
       </div>
       <p className="mt-3 text-sm leading-relaxed text-foreground/80">{protocol.rationale}</p>
       <p className="mt-4 text-xs text-muted-foreground">Discuss with your doctor.</p>
+    </div>
+  );
+}
+
+function SystemDetail({
+  detail,
+  defs,
+  onClose,
+}: {
+  detail: SystemScore;
+  defs: Map<string, TestDefinition>;
+  onClose: () => void;
+}) {
+  const rows = detail.contributions;
+  const seen = new Set<string>();
+  const summary = rows
+    .filter((c) => {
+      if (seen.has(c.result.test_name)) return false;
+      seen.add(c.result.test_name);
+      return true;
+    })
+    .slice(0, 2)
+    .map((c) => {
+      const status = statusInfo(resultStatus(c.result, defs.get(definitionKey(c.result.category, c.result.test_name))));
+      return `${c.result.test_name} ${c.result.result_value ?? "—"} ${c.result.unit ?? ""} — ${status.label}`.trim();
+    })
+    .join(", ");
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-extrabold tracking-tight text-ink">
+            {detail.system.name} — score {detail.score ?? "—"}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {summary ? `${summary} → score ${detail.score ?? "—"}` : "No scored biomarkers."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close system detail"
+          className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-ink"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="pb-2 font-semibold">Biomarker</th>
+              <th className="pb-2 font-semibold">Value</th>
+              <th className="pb-2 font-semibold">Flag</th>
+              <th className="pb-2 font-semibold">Collected</th>
+              <th className="pb-2 text-right font-semibold">Contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => {
+              const def = defs.get(definitionKey(c.result.category, c.result.test_name));
+              const status = statusInfo(resultStatus(c.result, def));
+              return (
+                <tr key={c.result.result_id} className="border-b border-border/60 last:border-0">
+                  <td className="py-2.5 font-semibold text-ink">{c.result.test_name}</td>
+                  <td className="py-2.5 tabular-nums text-foreground/80">
+                    {c.result.result_value ?? "—"} {c.result.unit ?? ""}
+                  </td>
+                  <td className="py-2.5">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-muted-foreground">{formatDate(c.result.date_collected)}</td>
+                  <td className="py-2.5 text-right font-extrabold tabular-nums text-ink">
+                    {c.score}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Score is the mean contribution across {detail.count} scored biomarker
+        {detail.count === 1 ? "" : "s"} (optimal 100, in-range 70, out of range 30, abnormal 0).
+      </p>
     </div>
   );
 }

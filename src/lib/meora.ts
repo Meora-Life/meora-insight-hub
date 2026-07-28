@@ -266,10 +266,16 @@ export function resultScore(result: FlatResult, def?: TestDefinition): number {
   return 70;
 }
 
+export interface SystemContribution {
+  result: FlatResult;
+  score: number;
+}
+
 export interface SystemScore {
   system: SystemDefinition;
   score: number | null;
   count: number;
+  contributions: SystemContribution[];
 }
 
 export function systemScores(
@@ -281,14 +287,26 @@ export function systemScores(
       const flag = (r.flag ?? "").toLowerCase();
       return ["normal", "high", "low", "abnormal"].includes(flag);
     });
-    if (scoped.length < 3) return { system, score: null, count: scoped.length };
-    const total = scoped.reduce(
-      (sum, r) => sum + resultScore(r, defs.get(definitionKey(r.category, r.test_name))),
-      0,
-    );
-    return { system, score: Math.round(total / scoped.length), count: scoped.length };
+    const contributions: SystemContribution[] = scoped
+      .map((r) => ({
+        result: r,
+        score: resultScore(r, defs.get(definitionKey(r.category, r.test_name))),
+      }))
+      .sort((a, b) => a.score - b.score);
+
+    if (scoped.length < 3) {
+      return { system, score: null, count: scoped.length, contributions };
+    }
+    const total = contributions.reduce((sum, c) => sum + c.score, 0);
+    return {
+      system,
+      score: Math.round(total / contributions.length),
+      count: scoped.length,
+      contributions,
+    };
   });
 }
+
 
 export function scoreColor(score: number): string {
   if (score >= 80) return "var(--optimal)";
@@ -362,7 +380,22 @@ function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "l
   });
 }
 
-export function recommendedProtocols(patient: Patient, results: FlatResult[]): Protocol[] {
+/** Keeps only the most recent result for each test, so stale panels don't drive protocols. */
+export function latestPerTest(results: FlatResult[]): FlatResult[] {
+  const map = new Map<string, FlatResult>();
+  for (const r of results) {
+    const key = definitionKey(r.category, r.test_name);
+    const prev = map.get(key);
+    if (!prev || (r.date_collected ?? "") > (prev.date_collected ?? "")) map.set(key, r);
+  }
+  return [...map.values()];
+}
+
+function describe(r: FlatResult, word: string): string {
+  return `${r.test_name} is ${word} at ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim();
+}
+
+export function recommendedProtocols(patient: Patient, allResults: FlatResult[]): Protocol[] {
   const risk = riskLevel(patient.notes);
   if (risk === "exclusion") {
     return [
@@ -375,7 +408,9 @@ export function recommendedProtocols(patient: Patient, results: FlatResult[]): P
     ];
   }
 
+  const results = latestPerTest(allResults);
   const protocols: Protocol[] = [];
+
 
   if (risk === "high_risk") {
     protocols.push({
@@ -457,14 +492,95 @@ export function recommendedProtocols(patient: Patient, results: FlatResult[]): P
     });
   }
 
+  const oestradiol = findFlagged(results, ["oestradiol", "estradiol"], "high");
+  if (oestradiol) {
+    protocols.push({
+      name: "Oestrogen Management Protocol",
+      rationale: `${describe(oestradiol, "elevated")} — review aromatisation, body composition and alcohol intake`,
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const bilirubin = findFlagged(results, ["bilirubin"], "high");
+  if (bilirubin) {
+    protocols.push({
+      name: "Hepatobiliary Review",
+      rationale: `${describe(bilirubin, "elevated")} — most often a benign Gilbert's pattern; recheck fasting with LFTs`,
+      urgency: "Recommended",
+      tone: "neutral",
+    });
+  }
+
+  const lipids = findFlagged(results, ["ldl", "non-hdl", "apolipoprotein b", "lipoprotein(a)"], "high");
+  if (lipids) {
+    protocols.push({
+      name: "Lipid Optimisation Protocol",
+      rationale: describe(lipids, "elevated"),
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const thyroidFn = findFlagged(results, ["tsh"], "high") ?? findFlagged(results, ["free t3", "free t4"], "low");
+  if (thyroidFn) {
+    protocols.push({
+      name: "Thyroid Function Review",
+      rationale: describe(thyroidFn, (thyroidFn.flag ?? "").toLowerCase() === "high" ? "elevated" : "low"),
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const gutFlags = results.filter(
+    (r) =>
+      r.category === "Gut & Microbiome" &&
+      ["high", "low", "abnormal"].includes((r.flag ?? "").toLowerCase()),
+  );
+  if (gutFlags.length >= 3) {
+    protocols.push({
+      name: "Gut Microbiome Rebalance",
+      rationale: `${gutFlags.length} flagged microbiome markers including ${gutFlags
+        .slice(0, 3)
+        .map((r) => r.test_name)
+        .join(", ")}`,
+      urgency: "Recommended",
+      tone: "neutral",
+    });
+  }
+
+  // Catch-all: never claim a clean bill of health while flags exist.
+  const covered = new Set(protocols.flatMap((p) => p.rationale.toLowerCase().split(/\s+/)));
+  const remainingFlagged = results.filter((r) => {
+    const flag = (r.flag ?? "").toLowerCase();
+    if (!["high", "low", "abnormal"].includes(flag)) return false;
+    if (r.category === "Gut & Microbiome" && gutFlags.length >= 3) return false;
+    return !covered.has(r.test_name.toLowerCase());
+  });
+
+  if (protocols.length === 0 && remainingFlagged.length > 0) {
+    protocols.push({
+      name: "Flagged Biomarker Review",
+      rationale: `${remainingFlagged.length} out-of-range marker${
+        remainingFlagged.length === 1 ? "" : "s"
+      }: ${remainingFlagged
+        .slice(0, 4)
+        .map((r) => `${r.test_name} ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim())
+        .join("; ")}`,
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
   if (protocols.length === 0) {
     protocols.push({
       name: "Maintenance Protocol",
-      rationale: "No flagged biomarkers — annual monitoring recommended",
+      rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
       urgency: "Recommended",
       tone: "green",
     });
   }
+
 
   return protocols;
 }
