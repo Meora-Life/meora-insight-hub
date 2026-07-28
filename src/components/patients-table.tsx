@@ -213,7 +213,7 @@ export function PatientsTable({
               </div>
 
               {expanded && (
-                <div className="border-t border-border bg-muted/50 px-5 py-5">
+                <div className="border-t border-border bg-card px-5 py-5">
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Current treatment plan
                   </div>
