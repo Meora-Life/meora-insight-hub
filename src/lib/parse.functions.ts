@@ -39,14 +39,19 @@ export const parsePdfReport = createServerFn({ method: "POST" })
     const byName = new Map<string, TestDefRow>();
     for (const def of definitions) byName.set(normaliseName(def.test_name), def);
 
-    const report = parseJsonReport(
-      await callClaude(
-        buildParsePrompt(
-          definitions.map((d) => d.test_name),
-          text,
+    let report;
+    try {
+      report = parseJsonReport(
+        await callClaude(
+          buildParsePrompt(
+            definitions.map((d) => d.test_name),
+            text,
+          ),
         ),
-      ),
-    );
+      );
+    } catch {
+      throw new Error(PARSE_FAILURE_MESSAGE);
+    }
 
     const matched: Array<{ def: TestDefRow; value: string; labFlag: string | null }> = [];
     const unmatched: string[] = [];
