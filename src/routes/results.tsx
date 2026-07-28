@@ -371,7 +371,7 @@ function AiSummaryPanel({
           {summary.isPending && (
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-              Analysing {flagged.length} flagged biomarkers…
+              Analysing {flagged.length} biomarkers…
             </div>
           )}
           {summary.isError && (
