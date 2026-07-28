@@ -428,86 +428,17 @@ function HomePage() {
       </section>
 
       <section className="mx-auto max-w-7xl px-6 pt-14">
-        <h2 className="text-xl font-extrabold tracking-tight text-ink">Existing patients</h2>
-        <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {patients.isPending &&
-            Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-[168px] rounded-xl" />
-            ))}
-          {patients.data?.map((p) => {
-            const summary = summaries.data?.get(p.patient_id);
-            const risk = riskLevel(p.notes);
-            const plan = parseTreatmentPlan(p.notes);
-            const activeMeds = (plan?.medications ?? []).filter(
-              (m) => m.name.trim() && isActiveStatus(m.status),
-            );
-            return (
-              <div
-                key={p.patient_id}
-                className="group flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)]"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="text-lg font-extrabold tracking-tight text-ink">
-                    {patientName(p)}
-                  </div>
-                  <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-                    {risk === "exclusion" && <Badge tone="red">Excluded</Badge>}
-                    {risk === "high_risk" && <Badge tone="amber">High Risk</Badge>}
-                    {activeMeds.length > 0 && <Badge tone="grey">On protocol</Badge>}
-                    {isSynthetic(p.notes) && <Badge tone="grey">Synthetic</Badge>}
-                  </div>
-                </div>
-                <dl className="mt-4 space-y-1.5 text-sm">
-                  <Row label="Date of birth" value={formatDate(p.date_of_birth)} />
-                  <Row label="Sex" value={p.sex ?? "—"} />
-                  <Row
-                    label="Results"
-                    value={summaries.isPending ? "…" : String(summary?.count ?? 0)}
-                  />
-                  <Row
-                    label="Last test"
-                    value={summaries.isPending ? "…" : formatDate(summary?.lastDate ?? null)}
-                  />
-                </dl>
-
-                <div className="mt-4 rounded-lg bg-muted/60 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Current treatment plan
-                  </div>
-                  {activeMeds.length === 0 && !plan?.summary?.trim() ? (
-                    <p className="mt-1 text-sm text-muted-foreground">Not on a protocol</p>
-                  ) : (
-                    <ul className="mt-1 space-y-0.5 text-sm text-foreground/85">
-                      {activeMeds.map((m, i) => (
-                        <li key={i}>{describeMedication(m)}</li>
-                      ))}
-                      {plan?.summary?.trim() && activeMeds.length === 0 && (
-                        <li>{plan.summary.trim()}</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <Link
-                    to="/results"
-                    search={{ patient: p.patient_id }}
-                    className="text-sm font-semibold text-primary hover:underline"
-                  >
-                    View results
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => setPlanPatient(p)}
-                    className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-ink hover:border-primary hover:text-primary"
-                  >
-                    {plan ? "Edit treatment plan" : "Add treatment plan"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
+        <h2 className="font-display text-3xl font-semibold tracking-tight text-ink">
+          Existing patients
+        </h2>
+        <div className="mt-6">
+          <PatientsTable
+            patients={patients.data ?? []}
+            summaries={summaries.data}
+            isPending={patients.isPending}
+            summariesPending={summaries.isPending}
+            onEditPlan={setPlanPatient}
+          />
         </div>
         {patients.isError && (
           <p className="mt-4 text-sm text-outofrange">
@@ -515,6 +446,7 @@ function HomePage() {
           </p>
         )}
       </section>
+
 
       {planPatient && (
         <TreatmentPlanEditor patient={planPatient} onClose={() => setPlanPatient(null)} />
