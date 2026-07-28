@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
-import { ArrowDownRight, ArrowUpRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDownRight, ArrowUpRight, Info, X } from "lucide-react";
 import { PageShell } from "@/components/site-chrome";
 import { PatientSelector } from "@/components/patient-selector";
 import { ArcDial } from "@/components/arc-dial";
@@ -14,18 +14,22 @@ import {
   testDefinitionsQuery,
 } from "@/lib/queries";
 import {
-  chronologicalAge,
+  definitionKey,
   formatDate,
-  numericValue,
   patientName,
   recommendedProtocols,
+  resultStatus,
   riskLevel,
   riskReason,
+  statusInfo,
   systemScores,
   wearablesFor,
   type Protocol,
+  type SystemScore,
 } from "@/lib/meora";
-import type { FlatResult, Patient } from "@/lib/types";
+import { BIO_AGE_TOOLTIP, biologicalAge } from "@/lib/bioage";
+import type { FlatResult, Patient, TestDefinition } from "@/lib/types";
+
 
 export const Route = createFileRoute("/dashboard")({
   validateSearch: (search: Record<string, unknown>): { patient?: string } => ({
