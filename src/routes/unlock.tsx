@@ -1,7 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
-import meoraLifeLogo from "@/assets/meora-life-logo.png.asset.json";
 import { unlockSite } from "@/lib/gate.functions";
 
 export const Route = createFileRoute("/unlock")({
