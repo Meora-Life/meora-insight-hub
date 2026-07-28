@@ -559,6 +559,7 @@ const COMPOSITE_RULES: CompositeRule[] = [
       "Men's TRT Evaluation",
       "TRT Evaluation",
       "Longevity",
+      "Performance + Recovery",
     ],
     note: "Lipoprotein(a) plus atherogenic particle burden and androgen decline drive long-term cardiovascular and healthspan risk.",
     triggers: [T.lpa, T.atherogenic, T.crp, T.testosterone, T.homocysteine, T.glycaemic],
