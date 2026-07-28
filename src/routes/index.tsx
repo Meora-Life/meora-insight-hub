@@ -1,10 +1,12 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState, type FormEvent } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import Papa from "papaparse";
 import { PageShell } from "@/components/site-chrome";
 import { Skeleton } from "@/components/ui-bits";
 import { isUnlocked } from "@/lib/gate.functions";
+import { parsePdfReport } from "@/lib/parse.functions";
 import {
   patientSummariesQuery,
   patientsQuery,
