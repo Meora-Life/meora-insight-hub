@@ -939,8 +939,8 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
-  // Composite, patient-agnostic protocol groupings evaluated against optimal ranges.
-  const composite = compositeProtocols(results);
+  // Composite, patient-agnostic protocol groupings evaluated against flagged results.
+  const composite = compositeProtocols(patient, results);
   if (composite.protocols.length) {
     const kept = protocols.filter((p) => !composite.superseded.has(p.name));
     protocols.length = 0;
@@ -950,7 +950,7 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
   // Catch-all: never claim a clean bill of health while flags exist.
   const covered = new Set(protocols.flatMap((p) => p.rationale.toLowerCase().split(/\s+/)));
   const remainingFlagged = results.filter((r) => {
-    if (markerDirection(r) === null && (r.flag ?? "").toLowerCase() !== "abnormal") return false;
+    if (protocolDirection(r) === null && (r.flag ?? "").toLowerCase() !== "abnormal") return false;
     if (r.category === "Gut & Microbiome" && gutFlags.length >= 3) return false;
     return !covered.has(r.test_name.toLowerCase());
   });
@@ -973,20 +973,22 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
   const { planProtocols, superseded } = treatmentPlanProtocols(patient, results);
   if (planProtocols.length) {
     const kept = protocols.filter(
-      (p) => !superseded.has(p.name) && p.name !== "Maintenance Protocol",
+      (p) => !superseded.has(p.name) && p.name !== "Longevity Maintenance",
     );
     return [...planProtocols, ...kept];
   }
 
   if (protocols.length === 0) {
     protocols.push({
-      name: "Maintenance Protocol",
-      rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
+      name: "Longevity Maintenance",
+      rationale:
+        "All markers on the most recent panel sit in range — maintain current lifestyle and repeat a full panel annually.",
       urgency: "Recommended",
       tone: "green",
-      action: "Initiate",
+      action: "Continue",
     });
   }
+
 
 
 
