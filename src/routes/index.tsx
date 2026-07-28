@@ -42,6 +42,24 @@ export const Route = createFileRoute("/")({
 
 type UploadMethod = "pdf" | "csv" | "manual";
 
+type ParseStage = null | "patient" | "extracting" | "analysing" | "saving";
+
+const STAGE_STEPS: Array<{ id: Exclude<ParseStage, null>; label: string }> = [
+  { id: "patient", label: "Creating patient record" },
+  { id: "extracting", label: "Extracting text from PDF" },
+  { id: "analysing", label: "Identifying tests and values with Claude" },
+  { id: "saving", label: "Matching biomarkers and saving results" },
+];
+
+async function fileToBase64(file: File): Promise<string> {
+  const buffer = new Uint8Array(await file.arrayBuffer());
+  let binary = "";
+  for (let i = 0; i < buffer.length; i += 8192) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
 interface NewPatientForm {
   first_name: string;
   last_name: string;
