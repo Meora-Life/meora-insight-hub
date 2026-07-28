@@ -121,7 +121,7 @@ export const parsePdfReport = createServerFn({ method: "POST" })
         test_def_id: m.def.test_def_id,
         result_value_numeric: numeric,
         result_value_text: numeric === null ? m.value.slice(0, 200) : null,
-        flag: deriveFlag(numeric, m.def, m.test.lab_flag),
+        flag: deriveFlag(numeric, m.def, m.labFlag),
         lab_flag: m.labFlag,
         notes: null,
       };
