@@ -337,8 +337,21 @@ function ProtocolCard({ protocol }: { protocol: Protocol }) {
           {protocol.urgency}
         </span>
       </div>
+      {protocol.action && (
+        <span className="mt-2 inline-block rounded-full bg-ink/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-ink">
+          {protocol.action}
+        </span>
+      )}
+      {protocol.details && protocol.details.length > 0 && (
+        <ul className="mt-3 space-y-1 border-l-2 border-ink/15 pl-3 text-sm text-foreground/85">
+          {protocol.details.map((d) => (
+            <li key={d}>{d}</li>
+          ))}
+        </ul>
+      )}
       <p className="mt-3 text-sm leading-relaxed text-foreground/80">{protocol.rationale}</p>
       <p className="mt-4 text-xs text-muted-foreground">Discuss with your doctor.</p>
+
     </div>
   );
 }
