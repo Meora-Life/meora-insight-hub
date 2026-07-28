@@ -19,6 +19,9 @@ import {
   statusInfo,
   type ResultFilter,
 } from "@/lib/meora";
+import { HighRiskBanner } from "@/components/risk-banner";
+import { riskFindings, type RiskFinding } from "@/lib/risk";
+import { clinicalNotes } from "@/lib/treatment";
 import type { FlatResult, StatusKey, TestDefinition } from "@/lib/types";
 
 export const Route = createFileRoute("/results")({
@@ -137,8 +140,14 @@ function ResultsPage() {
   }, [visible, statuses, filter]);
 
 
+  const findings = useMemo(
+    () => riskFindings(patient?.notes ?? null, results.data ?? []),
+    [patient?.notes, results.data],
+  );
+
   return (
     <PageShell>
+      {findings.length > 0 && <HighRiskBanner findings={findings} />}
       <div className="mx-auto max-w-7xl px-6 py-12">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-ink">
           Results &amp; Insights
@@ -215,6 +224,8 @@ function ResultsPage() {
           patientLabel={patient ? patientName(patient) : null}
           results={visible}
           statuses={statuses}
+          notes={clinicalNotes(patient?.notes ?? null)}
+          findings={findings}
         />
 
         <div className="mt-10 space-y-10">
@@ -308,10 +319,14 @@ function AiSummaryPanel({
   patientLabel,
   results,
   statuses,
+  notes,
+  findings,
 }: {
   patientLabel: string | null;
   results: FlatResult[];
   statuses: Map<string, StatusKey>;
+  notes: string | null;
+  findings: RiskFinding[];
 }) {
   const [open, setOpen] = useState(false);
   const generate = useServerFn(generateHealthSummary);
@@ -336,7 +351,15 @@ function AiSummaryPanel({
   const summary = useMutation({
     mutationFn: async () => {
       if (!patientLabel) throw new Error("Select a patient first");
-      return generate({ data: { patient_name: patientLabel, results: flagged } });
+      return generate({
+        data: {
+          patient_name: patientLabel,
+          results: flagged,
+          clinical_notes: notes,
+          high_risk: findings.length > 0,
+          risk_reasons: findings.map((f) => `${f.category}: ${f.detail}`),
+        },
+      });
     },
   });
 
