@@ -71,10 +71,14 @@ function DashboardPage() {
   const patient = patients.data?.find((p) => p.patient_id === selectedId) ?? null;
   const rows = results.data ?? [];
 
+  const [openSystem, setOpenSystem] = useState<string | null>(null);
+
   const scores = useMemo(
     () => systemScores(rows, definitions.data ?? new Map()),
     [rows, definitions.data],
   );
+  const openDetail = scores.find((s) => s.system.id === openSystem) ?? null;
+
 
   return (
     <PageShell>
