@@ -16,10 +16,8 @@ import {
 import { supabase } from "@/lib/supabase";
 import { TreatmentPlanEditor } from "@/components/treatment-plan-editor";
 import { PatientsTable } from "@/components/patients-table";
-import { describeMedication, isActiveStatus, parseTreatmentPlan } from "@/lib/treatment";
 import type { Patient } from "@/lib/types";
 
-import { formatDate, isSynthetic, patientName, riskLevel } from "@/lib/meora";
 
 export const Route = createFileRoute("/")({
   beforeLoad: async () => {
