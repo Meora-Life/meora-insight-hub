@@ -150,7 +150,7 @@ function DashboardPage() {
         )}
       </div>
 
-      {patient && (
+      {patient && riskLevel(patient.notes) === "none" && (
         <section className="border-t border-border bg-background">
           <div className="mx-auto max-w-7xl px-6 py-14">
             <h2 className="text-xl font-extrabold tracking-tight text-ink">
@@ -173,6 +173,7 @@ function DashboardPage() {
           </div>
         </section>
       )}
+
     </PageShell>
   );
 }
