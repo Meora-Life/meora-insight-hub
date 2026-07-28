@@ -765,14 +765,22 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
+  // Composite, patient-agnostic protocol groupings evaluated against optimal ranges.
+  const composite = compositeProtocols(results);
+  if (composite.protocols.length) {
+    const kept = protocols.filter((p) => !composite.superseded.has(p.name));
+    protocols.length = 0;
+    protocols.push(...composite.protocols, ...kept);
+  }
+
   // Catch-all: never claim a clean bill of health while flags exist.
   const covered = new Set(protocols.flatMap((p) => p.rationale.toLowerCase().split(/\s+/)));
   const remainingFlagged = results.filter((r) => {
-    const flag = (r.flag ?? "").toLowerCase();
-    if (!["high", "low", "abnormal"].includes(flag)) return false;
+    if (markerDirection(r) === null && (r.flag ?? "").toLowerCase() !== "abnormal") return false;
     if (r.category === "Gut & Microbiome" && gutFlags.length >= 3) return false;
     return !covered.has(r.test_name.toLowerCase());
   });
+
 
   if (protocols.length === 0 && remainingFlagged.length > 0) {
     protocols.push({
