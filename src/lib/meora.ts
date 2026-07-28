@@ -787,29 +787,13 @@ function describe(r: FlatResult, word: string): string {
 
 export function recommendedProtocols(patient: Patient, allResults: FlatResult[]): Protocol[] {
   const risk = riskLevel(patient.notes);
-  if (risk === "exclusion") {
-    return [
-      {
-        name: "Specialist Referral Required",
-        rationale: riskReason(patient.notes),
-        urgency: "Urgent",
-        tone: "red",
-      },
-    ];
-  }
+  // Exclusion and high-risk patients get the alert banner only — no protocol cards.
+  if (risk !== "none") return [];
 
   const results = latestPerTest(allResults);
   const protocols: Protocol[] = [];
 
 
-  if (risk === "high_risk") {
-    protocols.push({
-      name: "Nephrology / Specialist Referral Required",
-      rationale: riskReason(patient.notes),
-      urgency: "Urgent",
-      tone: "amber",
-    });
-  }
 
   const testosterone = findFlagged(results, ["testosterone"], "low");
   if (testosterone) {
