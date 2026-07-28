@@ -65,17 +65,51 @@ function ResultsPage() {
   const selectedId = patientParam ?? patients.data?.[0]?.patient_id ?? null;
   const results = useQuery(resultsQuery(selectedId));
   const [filter, setFilter] = useState<ResultFilter>("all");
+  const [submissionChoice, setSubmissionChoice] = useState<{
+    patientId: string | null;
+    submissionId: string | null;
+  }>({ patientId: null, submissionId: null });
 
   const patient = patients.data?.find((p) => p.patient_id === selectedId) ?? null;
   const defs: Map<string, TestDefinition> = definitions.data ?? new Map();
 
+  const submissions = useMemo(() => {
+    const map = new Map<string, { id: string; date: string | null; reportType: string | null }>();
+    for (const r of results.data ?? []) {
+      if (!map.has(r.submission_id)) {
+        map.set(r.submission_id, {
+          id: r.submission_id,
+          date: r.date_collected,
+          reportType: r.report_type,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
+  }, [results.data]);
+
+  const activeSubmission =
+    submissionChoice.patientId === selectedId ? submissionChoice.submissionId : null;
+
+  const visible = useMemo(() => {
+    const rows = results.data ?? [];
+    if (activeSubmission) return rows.filter((r) => r.submission_id === activeSubmission);
+    // Latest view: keep only the most recent result per test
+    const latest = new Map<string, FlatResult>();
+    for (const r of rows) {
+      const key = definitionKey(r.category, r.test_name);
+      const current = latest.get(key);
+      if (!current || (r.date_collected ?? "") > (current.date_collected ?? "")) latest.set(key, r);
+    }
+    return [...latest.values()];
+  }, [results.data, activeSubmission]);
+
   const statuses = useMemo(() => {
     const map = new Map<string, StatusKey>();
-    for (const r of results.data ?? []) {
+    for (const r of visible) {
       map.set(r.result_id, resultStatus(r, defs.get(definitionKey(r.category, r.test_name))));
     }
     return map;
-  }, [results.data, defs]);
+  }, [visible, defs]);
 
   const counts = useMemo(() => {
     let optimal = 0;
@@ -91,7 +125,7 @@ function ResultsPage() {
 
   const grouped = useMemo(() => {
     const groups = new Map<string, FlatResult[]>();
-    for (const r of results.data ?? []) {
+    for (const r of visible) {
       const status = statuses.get(r.result_id);
       if (!status || !matchesFilter(status, filter)) continue;
       const key = r.category ?? "Other";
@@ -100,7 +134,8 @@ function ResultsPage() {
       groups.set(key, list);
     }
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [results.data, statuses, filter]);
+  }, [visible, statuses, filter]);
+
 
   return (
     <PageShell>
@@ -116,6 +151,32 @@ function ResultsPage() {
             loading={patients.isPending}
             onChange={(id) => void navigate({ to: ".", search: { patient: id } })}
           />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label htmlFor="submission-select" className="text-sm font-semibold text-ink">
+            Submission
+          </label>
+          <select
+            id="submission-select"
+            value={activeSubmission ?? ""}
+            disabled={results.isPending}
+            onChange={(e) =>
+              setSubmissionChoice({
+                patientId: selectedId,
+                submissionId: e.target.value || null,
+              })
+            }
+            className="min-w-[320px] rounded-xl border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+          >
+            <option value="">Latest result per test (all submissions)</option>
+            {submissions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {formatDate(s.date)}
+                {s.reportType ? ` — ${s.reportType}` : ""}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -152,7 +213,7 @@ function ResultsPage() {
 
         <AiSummaryPanel
           patientLabel={patient ? patientName(patient) : null}
-          results={results.data ?? []}
+          results={visible}
           statuses={statuses}
         />
 
