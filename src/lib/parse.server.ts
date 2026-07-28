@@ -39,6 +39,9 @@ Return ONLY a JSON object, no prose and no markdown fences, in exactly this shap
 {"lab_name": string|null, "report_type": string|null, "date_collected": "YYYY-MM-DD"|null, "tests": [{"test_name": string, "value": string, "unit": string|null, "reference_range": string|null, "lab_flag": "normal"|"high"|"low"|"abnormal"|"not_detected"|"below_detection_limit"|null}]}
 
 Rules:
+- This report may contain multiple result columns showing historical data. Extract ONLY the most recent result for each test — the rightmost value column. Ignore all historical and previous result columns. Only extract values from the current/most recent test date.
+- Australian pathology reports (4Cyte, Sonic, Laverty, Douglass Hanly Moir, QML, Melbourne Pathology) often lay out 2-3 dated result columns side by side, oldest on the left and newest on the right. Column headers are usually collection dates. Use the newest date's column and set "date_collected" to that date.
+- Never merge values across columns, and never emit the same test twice — one row per analyte, using its most recent value.
 - Use the test names from this known list wherever the report refers to the same analyte (match synonyms and abbreviations to the list entry): ${knownTests.join(", ")}.
 - If a test is not in the list, keep the report's own name.
 - "value" is the measured result exactly as reported, digits only where numeric (no units, no < or > unless the report states a limit).
