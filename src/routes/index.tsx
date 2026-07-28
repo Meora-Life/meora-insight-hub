@@ -222,7 +222,9 @@ function HomePage() {
       <section className="mx-auto max-w-7xl px-6 pb-4 pt-16 md:pt-24">
         <div className="max-w-3xl">
           <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight text-ink md:text-6xl">
-            Built by science. It starts with <span className="text-primary">Me</span>.
+            Built by science. It starts with
+            <br />
+            <span className="text-primary">Me</span>.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/80">
             MeorAI reads your pathology, maps your biology, and builds a personalised protocol
