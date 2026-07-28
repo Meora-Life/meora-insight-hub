@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { callClaude } from "./ai.server";
 import {
+  PARSE_FAILURE_MESSAGE,
   buildParsePrompt,
   deriveFlag,
   extractPdfText,
