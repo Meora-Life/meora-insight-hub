@@ -14,6 +14,8 @@ export interface ExtractedReport {
   lab_name: string | null;
   report_type: string | null;
   date_collected: string | null;
+  /** Doctor's notes, comments, clinical history or indication text on the report. */
+  clinical_notes: string | null;
   tests: ExtractedTest[];
 }
 
@@ -38,7 +40,7 @@ export function buildParsePrompt(knownTests: string[], reportText: string): stri
   return `You are a pathology report parser. Extract every test result from the report text below.
 
 Return ONLY a JSON object, no prose and no markdown fences, in exactly this shape:
-{"lab_name": string|null, "report_type": string|null, "date_collected": "YYYY-MM-DD"|null, "tests": [{"test_name": string, "value": string, "unit": string|null, "reference_range": string|null, "date": "YYYY-MM-DD"|null, "lab_flag": "normal"|"high"|"low"|"abnormal"|"not_detected"|"below_detection_limit"|null}]}
+{"lab_name": string|null, "report_type": string|null, "date_collected": "YYYY-MM-DD"|null, "clinical_notes": string|null, "tests": [{"test_name": string, "value": string, "unit": string|null, "reference_range": string|null, "date": "YYYY-MM-DD"|null, "lab_flag": "normal"|"high"|"low"|"abnormal"|"not_detected"|"below_detection_limit"|null}]}
 
 Rules:
 - This report may contain multiple result columns showing historical data (Australian labs such as 4Cyte, Sonic, Laverty, Douglass Hanly Moir, QML and Melbourne Pathology commonly print 2-3 dated columns side by side). Extract EVERY result instance you can see, including all historical columns. Do not decide which one is most recent — that is handled downstream.
@@ -49,6 +51,7 @@ Rules:
 - Use the test names from this known list wherever the report refers to the same analyte (match synonyms and abbreviations to the list entry): ${knownTests.join(", ")}.
 - If a test is not in the list, keep the report's own name.
 - "value" is the measured result exactly as reported, digits only where numeric (no units, no < or > unless the report states a limit).
+- Set "clinical_notes" to any clinical notes, doctor's notes, pathologist comments, clinical history, indication or reason-for-test text printed on the report, copied verbatim and joined with newlines. Use null if the report contains none. Never summarise or invent clinical notes.
 - Never invent tests, values or dates. Omit anything you cannot read confidently.
 
 Report text:
@@ -107,6 +110,7 @@ export function parseJsonReport(raw: string): ExtractedReport {
         lab_name: parsed.lab_name ?? null,
         report_type: parsed.report_type ?? null,
         date_collected: parsed.date_collected ?? null,
+        clinical_notes: parsed.clinical_notes ?? null,
         tests: Array.isArray(parsed.tests) ? parsed.tests : [],
       };
     } catch {
@@ -121,6 +125,7 @@ export function parseJsonReport(raw: string): ExtractedReport {
     lab_name: scalar(cleaned, "lab_name"),
     report_type: scalar(cleaned, "report_type"),
     date_collected: scalar(cleaned, "date_collected"),
+    clinical_notes: scalar(cleaned, "clinical_notes"),
     tests,
   };
 }
@@ -182,6 +187,47 @@ export function normaliseName(name: string): string {
     .replace(/\(.*?\)/g, " ")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+/**
+ * Australian labs print the same analyte under many names. Variants are mapped
+ * to the canonical test_definitions name before the exact-match lookup runs.
+ */
+export const TEST_NAME_ALIASES: Record<string, string> = {
+  "LDL-c": "LDL Cholesterol",
+  "LDL": "LDL Cholesterol",
+  "HDL-c": "HDL Cholesterol",
+  "HDL": "HDL Cholesterol",
+  "Triglyceride": "Triglycerides",
+  "Cholesterol": "Total Cholesterol",
+  "Glucose Fasting": "Fasting Glucose",
+  "Fasting Glucose": "Fasting Glucose",
+  "Free T4": "Thyroxine (T4) Free",
+  "FT4": "Thyroxine (T4) Free",
+  "Free T3": "Triiodothyronine (T3) Free",
+  "FT3": "Triiodothyronine (T3) Free",
+  "TSH": "Thyroid-Stimulating Hormone (TSH)",
+  "HbA1c": "Hemoglobin A1c (HbA1c)",
+  "Haemoglobin A1c": "Hemoglobin A1c (HbA1c)",
+  "Hemoglobin A1c": "Hemoglobin A1c (HbA1c)",
+  "eGFR": "eGFR",
+  "CRP": "High-Sensitivity C-Reactive Protein (hs-CRP)",
+  "hsCRP": "High-Sensitivity C-Reactive Protein (hs-CRP)",
+  "hs-CRP": "High-Sensitivity C-Reactive Protein (hs-CRP)",
+  "C-Reactive Protein": "High-Sensitivity C-Reactive Protein (hs-CRP)",
+};
+
+const ALIAS_KEYS = new Map<string, string>(
+  Object.entries(TEST_NAME_ALIASES).map(([variant, canonical]) => [
+    normaliseName(variant),
+    normaliseName(canonical),
+  ]),
+);
+
+/** Normalised lookup key with the alias map applied first. */
+export function canonicalKey(name: string): string {
+  const key = normaliseName(name);
+  return ALIAS_KEYS.get(key) ?? key;
 }
 
 const LAB_FLAGS = new Set([

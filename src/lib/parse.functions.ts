@@ -1,8 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { callClaude } from "./ai.server";
+import { clinicalNotes, parseTreatmentPlan, serialiseNotes } from "./treatment";
+import { riskFindings, riskSummaryLine } from "./risk";
+import type { FlatResult } from "./types";
 import {
   PARSE_FAILURE_MESSAGE,
+  canonicalKey,
   buildParsePrompt,
   deriveFlag,
   extractPdfText,
@@ -10,7 +14,6 @@ import {
   latestPerTest,
   nextSequentialId,
   normaliseDate,
-  normaliseName,
   numericValue,
   parseJsonReport,
   serverSupabase,
@@ -41,7 +44,7 @@ export const parsePdfReport = createServerFn({ method: "POST" })
     const definitions = (defRows ?? []) as TestDefRow[];
 
     const byName = new Map<string, TestDefRow>();
-    for (const def of definitions) byName.set(normaliseName(def.test_name), def);
+    for (const def of definitions) byName.set(canonicalKey(def.test_name), def);
 
     let report;
     try {
@@ -59,12 +62,12 @@ export const parsePdfReport = createServerFn({ method: "POST" })
 
     // Claude extracts every dated result instance; we deterministically keep the
     // most recent row per analyte here rather than trusting its layout judgement.
-    const deduped = latestPerTest(report.tests ?? []);
+    const deduped = latestPerTest(report.tests ?? [], canonicalKey);
 
     const matched: Array<{ def: TestDefRow; value: string; labFlag: string | null }> = [];
     const unmatched: string[] = [];
     for (const test of deduped) {
-      const def = byName.get(normaliseName(String(test.test_name)));
+      const def = byName.get(canonicalKey(String(test.test_name)));
       if (!def) {
         unmatched.push(String(test.test_name));
         continue;
@@ -140,9 +143,50 @@ export const parsePdfReport = createServerFn({ method: "POST" })
     const { error: insertError } = await supabase.from("test_results").insert(rows);
     if (insertError) throw new Error(insertError.message);
 
+    /* ---- clinical notes + high-risk scan -------------------------------- */
+
+    const scanResults = rows.map((row, i) => ({
+      test_name: matched[i].def.test_name,
+      result_value: row.result_value_numeric !== null ? String(row.result_value_numeric) : row.result_value_text,
+      unit: matched[i].def.unit,
+      flag: row.flag,
+      lab_flag: row.lab_flag,
+      reference_range: null,
+    })) as unknown as FlatResult[];
+
+    const { data: patientRow } = await supabase
+      .from("patients")
+      .select("notes")
+      .eq("patient_id", data.patient_id)
+      .maybeSingle();
+    const existingNotes = (patientRow as { notes?: string | null } | null)?.notes ?? null;
+    const plan = parseTreatmentPlan(existingNotes);
+
+    let clinical = (clinicalNotes(existingNotes) ?? "")
+      .replace(/^HIGH RISK:.*$/gim, "")
+      .trim();
+    const extracted = report.clinical_notes?.trim();
+    if (extracted && !clinical.includes(extracted)) {
+      clinical = [clinical, extracted].filter(Boolean).join("\n\n");
+    }
+
+    const findings = riskFindings(clinical, scanResults);
+    if (findings.length > 0) {
+      clinical = `HIGH RISK: ${riskSummaryLine(findings)}\n\n${clinical}`.trim();
+    }
+
+    const { error: notesError } = await supabase
+      .from("patients")
+      .update({ notes: serialiseNotes(clinical, plan) })
+      .eq("patient_id", data.patient_id);
+    if (notesError) throw new Error(notesError.message);
+
     return {
       submission_id: submissionId,
       inserted: rows.length,
+      clinical_notes: extracted ?? null,
+      high_risk: findings.length > 0,
+      risk_findings: findings,
       unmatched: unmatched.slice(0, 20),
       date_collected: dateCollected,
       lab_name: report.lab_name,

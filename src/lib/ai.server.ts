@@ -8,7 +8,17 @@ export interface FlaggedResultInput {
   status: string;
 }
 
-export function buildSummaryPrompt(patientName: string, results: FlaggedResultInput[]): string {
+export interface SummaryContext {
+  clinical_notes?: string | null;
+  high_risk?: boolean;
+  risk_reasons?: string[];
+}
+
+export function buildSummaryPrompt(
+  patientName: string,
+  results: FlaggedResultInput[],
+  context: SummaryContext = {},
+): string {
   const lines = results
     .map(
       (r) =>
@@ -18,10 +28,22 @@ export function buildSummaryPrompt(patientName: string, results: FlaggedResultIn
     )
     .join("\n");
 
+  const notesBlock = context.clinical_notes?.trim()
+    ? `\n\nClinical notes on file for ${patientName} (use these for context before analysing anything):\n${context.clinical_notes.trim()}`
+    : "";
+
+  const riskBlock = context.high_risk
+    ? `\n\nCRITICAL: This patient is flagged HIGH RISK for the following reasons: ${
+        (context.risk_reasons ?? []).join("; ") || "clinical red flags detected"
+      }. You MUST open your response with a section headed "Risk Flag" stating the high-risk status and the reason, before any other analysis. Do not recommend initiating any protocol; state that specialist review and referral to the treating physician are required first.`
+    : "";
+
   return `You are a clinical health analyst for Meora, an Australian longevity telehealth clinic. The patient's name is exactly "${patientName}" — refer to them only by that name and never invent another name. Analyse the full panel below — it contains every result from the selected submission, both in-range and out-of-range. Provide: 1) A brief overview of their health status, 2) The top 3 findings that need attention, 3) Three specific recommended actions. Be direct, clinical, and evidence-based. Do not mention specific medication names. Always recommend consulting with a GP before acting on any findings.
 
 Results:
 ${lines || `No biomarkers are flagged as suboptimal or out of range for ${patientName}; every measured marker sits within its reference range. Frame the overview around this, and make the findings and actions about maintaining and monitoring current status.`}
+
+${notesBlock}${riskBlock}
 
 Format your response with the section headers "Overview", "Key Findings" and "Recommended Actions". Use plain text with short paragraphs and numbered lists. Do not use markdown asterisks or emojis.`;
 }

@@ -28,6 +28,8 @@ import {
   type SystemScore,
 } from "@/lib/meora";
 import { BIO_AGE_TOOLTIP, biologicalAge } from "@/lib/bioage";
+import { HighRiskBanner } from "@/components/risk-banner";
+import { riskFindings } from "@/lib/risk";
 import type { FlatResult, Patient, TestDefinition } from "@/lib/types";
 
 
@@ -79,9 +81,21 @@ function DashboardPage() {
   );
   const openDetail = scores.find((s) => s.system.id === openSystem) ?? null;
 
+  const findings = useMemo(
+    () => riskFindings(patient?.notes ?? null, rows),
+    [patient?.notes, rows],
+  );
+  const highRisk = findings.length > 0;
+
+  const triggerRows = useMemo(() => {
+    if (!highRisk) return [];
+    const names = findings.map((f) => f.detail.toLowerCase());
+    return rows.filter((r) => names.some((d) => d.includes(r.test_name.toLowerCase())));
+  }, [highRisk, findings, rows]);
 
   return (
     <PageShell>
+      {highRisk && <HighRiskBanner findings={findings} />}
       <div className="mx-auto max-w-7xl px-6 py-12">
         <h1 className="font-display text-4xl font-semibold tracking-tight text-ink">Dashboard</h1>
 
@@ -105,6 +119,48 @@ function DashboardPage() {
           <Skeleton className="mt-8 h-52 rounded-xl" />
         )}
 
+        {highRisk && (
+          <section className="mt-12">
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">
+              Results that triggered the high-risk flag
+            </h2>
+            <div className="mt-4 overflow-hidden rounded-xl border border-outofrange/40 bg-card shadow-[var(--shadow-card)]">
+              {triggerRows.length === 0 ? (
+                <ul className="space-y-1 px-6 py-5 text-sm text-foreground/85">
+                  {findings.map((f) => (
+                    <li key={f.detail}>
+                      <span className="font-semibold text-ink">{f.category}</span> — {f.detail}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                triggerRows.map((r) => (
+                  <div
+                    key={r.result_id}
+                    className="flex flex-wrap items-baseline justify-between gap-3 border-b border-border px-6 py-3 text-sm last:border-0"
+                  >
+                    <span className="font-semibold text-ink">{r.test_name}</span>
+                    <span className="tabular-nums text-foreground/85">
+                      {r.result_value ?? "—"} {r.unit ?? ""}
+                    </span>
+                    <span className="text-xs uppercase tracking-wide text-outofrange">
+                      {r.flag ?? r.lab_flag ?? "flagged"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {formatDate(r.date_collected)}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">
+              System health scores and wearables are suppressed for high-risk patients until
+              specialist review is complete.
+            </p>
+          </section>
+        )}
+
+        {!highRisk && (
         <section className="mt-12">
           <h2 className="text-xl font-extrabold tracking-tight text-ink">System Health Scores</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -140,9 +196,10 @@ function DashboardPage() {
             />
           )}
         </section>
+        )}
 
 
-        {patient && (
+        {patient && !highRisk && (
           <section className="mt-12">
             <h2 className="text-xl font-extrabold tracking-tight text-ink">Wearables</h2>
             <WearablesStrip patient={patient} />
@@ -150,7 +207,26 @@ function DashboardPage() {
         )}
       </div>
 
-      {patient && riskLevel(patient.notes) === "none" && (
+      {patient && highRisk && (
+        <section className="border-t border-border bg-background">
+          <div className="mx-auto max-w-7xl px-6 py-14">
+            <h2 className="text-xl font-extrabold tracking-tight text-ink">
+              Protocols to Explore
+            </h2>
+            <div className="mt-6 max-w-2xl rounded-xl border border-suboptimal/50 bg-suboptimal-soft p-6 shadow-[var(--shadow-card)]">
+              <h3 className="font-semibold text-ink">
+                Specialist review required before any protocol is considered
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+                No protocol recommendations are generated for high-risk patients. Refer to the
+                treating physician.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {patient && !highRisk && riskLevel(patient.notes) === "none" && (
         <section className="border-t border-border bg-background">
           <div className="mx-auto max-w-7xl px-6 py-14">
             <h2 className="text-xl font-extrabold tracking-tight text-ink">
@@ -201,9 +277,9 @@ function HeroCard({
 
   return (
     <div className="mt-8 overflow-hidden rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
-      {risk !== "none" && (
+      {risk === "exclusion" && (
         <div className="bg-outofrange px-8 py-4 text-sm font-semibold text-white">
-          {risk === "exclusion" ? "Exclusion — " : "High risk — "}
+          {"Exclusion — "}
           <span className="font-medium">{riskReason(patient.notes)}</span>
           <span className="mt-1 block font-medium">
             No protocols are recommended. Specialist review required before any Meora programme.

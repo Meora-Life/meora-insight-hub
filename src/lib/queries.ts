@@ -1,6 +1,7 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 import { definitionKey } from "./meora";
+import { resultRiskFindings, type RiskFinding } from "./risk";
 import type { FlatResult, Patient, TestDefinition } from "./types";
 
 export const patientsQuery = () =>
@@ -54,6 +55,8 @@ export interface PatientSummaryRow {
   patient_id: string;
   count: number;
   lastDate: string | null;
+  /** High-risk findings triggered by this patient's results. */
+  riskFindings: RiskFinding[];
 }
 
 export const patientSummariesQuery = () =>
@@ -63,23 +66,29 @@ export const patientSummariesQuery = () =>
     queryFn: async (): Promise<Map<string, PatientSummaryRow>> => {
       const { data, error } = await supabase
         .from("flat_view_all_results")
-        .select("patient_id, date_collected");
+        .select("patient_id, date_collected, test_name, result_value, unit, flag, lab_flag");
       if (error) throw new Error(error.message);
       const map = new Map<string, PatientSummaryRow>();
-      for (const row of (data ?? []) as Array<{
-        patient_id: string;
-        date_collected: string | null;
-      }>) {
+      const byPatient = new Map<string, FlatResult[]>();
+      for (const row of (data ?? []) as FlatResult[]) {
         const entry = map.get(row.patient_id) ?? {
           patient_id: row.patient_id,
           count: 0,
           lastDate: null,
+          riskFindings: [],
         };
         entry.count += 1;
         if (row.date_collected && (!entry.lastDate || row.date_collected > entry.lastDate)) {
           entry.lastDate = row.date_collected;
         }
         map.set(row.patient_id, entry);
+        const list = byPatient.get(row.patient_id) ?? [];
+        list.push(row);
+        byPatient.set(row.patient_id, list);
+      }
+      for (const [patientId, rows] of byPatient) {
+        const entry = map.get(patientId);
+        if (entry) entry.riskFindings = resultRiskFindings(rows);
       }
       return map;
     },
