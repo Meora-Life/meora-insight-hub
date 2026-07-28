@@ -1,4 +1,13 @@
 import type { FlatResult, Patient, StatusInfo, StatusKey, TestDefinition } from "./types";
+import {
+  clinicalNotes,
+  describeMedication,
+  domainFor,
+  isActiveStatus,
+  parseTreatmentPlan,
+  type TreatmentDomain,
+  type TreatmentMedication,
+} from "./treatment";
 
 /* ------------------------------------------------------------------ */
 /* Patient helpers                                                     */
@@ -11,22 +20,24 @@ export function patientName(p: Patient): string {
 export type RiskLevel = "exclusion" | "high_risk" | "none";
 
 export function riskLevel(notes: string | null): RiskLevel {
-  const n = (notes ?? "").toUpperCase();
+  const n = (clinicalNotes(notes) ?? "").toUpperCase();
   if (n.includes("EXCLUSION")) return "exclusion";
   if (n.includes("HIGH RISK")) return "high_risk";
   return "none";
 }
 
 export function isSynthetic(notes: string | null): boolean {
-  return (notes ?? "").toUpperCase().includes("SYNTHETIC");
+  return (clinicalNotes(notes) ?? "").toUpperCase().includes("SYNTHETIC");
 }
 
 /** Extracts the clinical reason that follows the EXCLUSION / HIGH RISK marker. */
 export function riskReason(notes: string | null): string {
-  if (!notes) return "";
-  const match = notes.match(/(EXCLUSION|HIGH RISK)\s*:?\s*(.*)$/is);
-  return match ? match[2].trim() : notes.trim();
+  const source = clinicalNotes(notes);
+  if (!source) return "";
+  const match = source.match(/(EXCLUSION|HIGH RISK)\s*:?\s*(.*)$/is);
+  return match ? match[2].trim() : source.trim();
 }
+
 
 export function chronologicalAge(dob: string | null, at?: string | null): number | null {
   if (!dob) return null;
