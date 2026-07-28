@@ -153,6 +153,32 @@ function ResultsPage() {
           />
         </div>
 
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <label htmlFor="submission-select" className="text-sm font-semibold text-ink">
+            Submission
+          </label>
+          <select
+            id="submission-select"
+            value={activeSubmission ?? ""}
+            disabled={results.isPending}
+            onChange={(e) =>
+              setSubmissionChoice({
+                patientId: selectedId,
+                submissionId: e.target.value || null,
+              })
+            }
+            className="min-w-[320px] rounded-xl border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+          >
+            <option value="">Latest result per test (all submissions)</option>
+            {submissions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {formatDate(s.date)}
+                {s.reportType ? ` — ${s.reportType}` : ""}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Pill label="Total results" value={results.isPending ? "…" : counts.total} />
           <Pill
