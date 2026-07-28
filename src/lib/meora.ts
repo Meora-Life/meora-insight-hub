@@ -266,10 +266,16 @@ export function resultScore(result: FlatResult, def?: TestDefinition): number {
   return 70;
 }
 
+export interface SystemContribution {
+  result: FlatResult;
+  score: number;
+}
+
 export interface SystemScore {
   system: SystemDefinition;
   score: number | null;
   count: number;
+  contributions: SystemContribution[];
 }
 
 export function systemScores(
@@ -281,14 +287,26 @@ export function systemScores(
       const flag = (r.flag ?? "").toLowerCase();
       return ["normal", "high", "low", "abnormal"].includes(flag);
     });
-    if (scoped.length < 3) return { system, score: null, count: scoped.length };
-    const total = scoped.reduce(
-      (sum, r) => sum + resultScore(r, defs.get(definitionKey(r.category, r.test_name))),
-      0,
-    );
-    return { system, score: Math.round(total / scoped.length), count: scoped.length };
+    const contributions: SystemContribution[] = scoped
+      .map((r) => ({
+        result: r,
+        score: resultScore(r, defs.get(definitionKey(r.category, r.test_name))),
+      }))
+      .sort((a, b) => a.score - b.score);
+
+    if (scoped.length < 3) {
+      return { system, score: null, count: scoped.length, contributions };
+    }
+    const total = contributions.reduce((sum, c) => sum + c.score, 0);
+    return {
+      system,
+      score: Math.round(total / contributions.length),
+      count: scoped.length,
+      contributions,
+    };
   });
 }
+
 
 export function scoreColor(score: number): string {
   if (score >= 80) return "var(--optimal)";
