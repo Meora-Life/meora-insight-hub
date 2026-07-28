@@ -492,14 +492,95 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
+  const oestradiol = findFlagged(results, ["oestradiol", "estradiol"], "high");
+  if (oestradiol) {
+    protocols.push({
+      name: "Oestrogen Management Protocol",
+      rationale: `${describe(oestradiol, "elevated")} — review aromatisation, body composition and alcohol intake`,
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const bilirubin = findFlagged(results, ["bilirubin"], "high");
+  if (bilirubin) {
+    protocols.push({
+      name: "Hepatobiliary Review",
+      rationale: `${describe(bilirubin, "elevated")} — most often a benign Gilbert's pattern; recheck fasting with LFTs`,
+      urgency: "Recommended",
+      tone: "neutral",
+    });
+  }
+
+  const lipids = findFlagged(results, ["ldl", "non-hdl", "apolipoprotein b", "lipoprotein(a)"], "high");
+  if (lipids) {
+    protocols.push({
+      name: "Lipid Optimisation Protocol",
+      rationale: describe(lipids, "elevated"),
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const thyroidFn = findFlagged(results, ["tsh"], "high") ?? findFlagged(results, ["free t3", "free t4"], "low");
+  if (thyroidFn) {
+    protocols.push({
+      name: "Thyroid Function Review",
+      rationale: describe(thyroidFn, (thyroidFn.flag ?? "").toLowerCase() === "high" ? "elevated" : "low"),
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
+  const gutFlags = results.filter(
+    (r) =>
+      r.category === "Gut & Microbiome" &&
+      ["high", "low", "abnormal"].includes((r.flag ?? "").toLowerCase()),
+  );
+  if (gutFlags.length >= 3) {
+    protocols.push({
+      name: "Gut Microbiome Rebalance",
+      rationale: `${gutFlags.length} flagged microbiome markers including ${gutFlags
+        .slice(0, 3)
+        .map((r) => r.test_name)
+        .join(", ")}`,
+      urgency: "Recommended",
+      tone: "neutral",
+    });
+  }
+
+  // Catch-all: never claim a clean bill of health while flags exist.
+  const covered = new Set(protocols.flatMap((p) => p.rationale.toLowerCase().split(/\s+/)));
+  const remainingFlagged = results.filter((r) => {
+    const flag = (r.flag ?? "").toLowerCase();
+    if (!["high", "low", "abnormal"].includes(flag)) return false;
+    if (r.category === "Gut & Microbiome" && gutFlags.length >= 3) return false;
+    return !covered.has(r.test_name.toLowerCase());
+  });
+
+  if (protocols.length === 0 && remainingFlagged.length > 0) {
+    protocols.push({
+      name: "Flagged Biomarker Review",
+      rationale: `${remainingFlagged.length} out-of-range marker${
+        remainingFlagged.length === 1 ? "" : "s"
+      }: ${remainingFlagged
+        .slice(0, 4)
+        .map((r) => `${r.test_name} ${r.result_value ?? "—"} ${r.unit ?? ""}`.trim())
+        .join("; ")}`,
+      urgency: "Priority",
+      tone: "amber",
+    });
+  }
+
   if (protocols.length === 0) {
     protocols.push({
       name: "Maintenance Protocol",
-      rationale: "No flagged biomarkers — annual monitoring recommended",
+      rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
       urgency: "Recommended",
       tone: "green",
     });
   }
+
 
   return protocols;
 }
