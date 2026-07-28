@@ -342,3 +342,88 @@ function ProtocolCard({ protocol }: { protocol: Protocol }) {
     </div>
   );
 }
+
+function SystemDetail({
+  detail,
+  defs,
+  onClose,
+}: {
+  detail: SystemScore;
+  defs: Map<string, TestDefinition>;
+  onClose: () => void;
+}) {
+  const rows = detail.contributions;
+  const summary = rows
+    .slice(0, 2)
+    .map((c) => {
+      const status = statusInfo(resultStatus(c.result, defs.get(definitionKey(c.result.category, c.result.test_name))));
+      return `${c.result.test_name} ${c.result.result_value ?? "—"} ${c.result.unit ?? ""} — ${status.label}`.trim();
+    })
+    .join(", ");
+
+  return (
+    <div className="mt-6 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-lg font-extrabold tracking-tight text-ink">
+            {detail.system.name} — score {detail.score ?? "—"}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {summary ? `${summary} → score ${detail.score ?? "—"}` : "No scored biomarkers."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close system detail"
+          className="rounded-full p-2 text-muted-foreground transition hover:bg-muted hover:text-ink"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
+
+      <div className="mt-5 overflow-x-auto">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="pb-2 font-semibold">Biomarker</th>
+              <th className="pb-2 font-semibold">Value</th>
+              <th className="pb-2 font-semibold">Flag</th>
+              <th className="pb-2 font-semibold">Collected</th>
+              <th className="pb-2 text-right font-semibold">Contribution</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => {
+              const def = defs.get(definitionKey(c.result.category, c.result.test_name));
+              const status = statusInfo(resultStatus(c.result, def));
+              return (
+                <tr key={c.result.result_id} className="border-b border-border/60 last:border-0">
+                  <td className="py-2.5 font-semibold text-ink">{c.result.test_name}</td>
+                  <td className="py-2.5 tabular-nums text-foreground/80">
+                    {c.result.result_value ?? "—"} {c.result.unit ?? ""}
+                  </td>
+                  <td className="py-2.5">
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${status.className}`}
+                    >
+                      {status.label}
+                    </span>
+                  </td>
+                  <td className="py-2.5 text-muted-foreground">{formatDate(c.result.date_collected)}</td>
+                  <td className="py-2.5 text-right font-extrabold tabular-nums text-ink">
+                    {c.score}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-4 text-xs text-muted-foreground">
+        Score is the mean contribution across {detail.count} scored biomarker
+        {detail.count === 1 ? "" : "s"} (optimal 100, in-range 70, out of range 30, abnormal 0).
+      </p>
+    </div>
+  );
+}
