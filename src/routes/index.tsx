@@ -97,6 +97,8 @@ function HomePage() {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pasted, setPasted] = useState("");
   const [stage, setStage] = useState<ParseStage>(null);
+  const [planPatient, setPlanPatient] = useState<Patient | null>(null);
+
   const [csvMatches, setCsvMatches] = useState<{ matched: string[]; unmatched: string[] } | null>(
     null,
   );
