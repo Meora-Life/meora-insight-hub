@@ -319,11 +319,16 @@ function HomePage() {
                   <input
                     type="file"
                     accept=".pdf"
-                    onChange={(e) => setFileName(e.target.files?.[0]?.name ?? "")}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setPdfFile(file);
+                      setFileName(file?.name ?? "");
+                    }}
                     className={fileInputClass}
                   />
                 </Field>
               )}
+
 
               {method === "csv" && (
                 <div className="space-y-3">
