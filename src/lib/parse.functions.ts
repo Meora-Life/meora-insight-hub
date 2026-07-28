@@ -6,7 +6,10 @@ import {
   buildParsePrompt,
   deriveFlag,
   extractPdfText,
+  latestDate,
+  latestPerTest,
   nextSequentialId,
+  normaliseDate,
   normaliseName,
   numericValue,
   parseJsonReport,
@@ -54,18 +57,18 @@ export const parsePdfReport = createServerFn({ method: "POST" })
       throw new Error(PARSE_FAILURE_MESSAGE);
     }
 
+    // Claude extracts every dated result instance; we deterministically keep the
+    // most recent row per analyte here rather than trusting its layout judgement.
+    const deduped = latestPerTest(report.tests ?? []);
+
     const matched: Array<{ def: TestDefRow; value: string; labFlag: string | null }> = [];
     const unmatched: string[] = [];
-    const seen = new Set<string>();
-    for (const test of report.tests) {
-      if (!test?.test_name || test.value === undefined || test.value === null) continue;
+    for (const test of deduped) {
       const def = byName.get(normaliseName(String(test.test_name)));
       if (!def) {
         unmatched.push(String(test.test_name));
         continue;
       }
-      if (seen.has(def.test_def_id)) continue;
-      seen.add(def.test_def_id);
       matched.push({
         def,
         value: String(test.value).trim(),
@@ -90,9 +93,10 @@ export const parsePdfReport = createServerFn({ method: "POST" })
       (subs ?? []).map((s: { submission_id: string }) => s.submission_id),
     );
 
-    const dateCollected = /^\d{4}-\d{2}-\d{2}$/.test(report.date_collected ?? "")
-      ? report.date_collected
-      : new Date().toISOString().slice(0, 10);
+    const dateCollected =
+      latestDate(deduped) ??
+      normaliseDate(report.date_collected) ??
+      new Date().toISOString().slice(0, 10);
 
     const { error: subInsertError } = await supabase.from("report_submissions").insert({
       submission_id: submissionId,
