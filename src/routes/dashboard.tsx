@@ -353,7 +353,13 @@ function SystemDetail({
   onClose: () => void;
 }) {
   const rows = detail.contributions;
+  const seen = new Set<string>();
   const summary = rows
+    .filter((c) => {
+      if (seen.has(c.result.test_name)) return false;
+      seen.add(c.result.test_name);
+      return true;
+    })
     .slice(0, 2)
     .map((c) => {
       const status = statusInfo(resultStatus(c.result, defs.get(definitionKey(c.result.category, c.result.test_name))));
