@@ -14,7 +14,6 @@ import {
   latestPerTest,
   nextSequentialId,
   normaliseDate,
-  normaliseName,
   numericValue,
   parseJsonReport,
   serverSupabase,
