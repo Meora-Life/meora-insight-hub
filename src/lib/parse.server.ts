@@ -125,6 +125,57 @@ export function parseJsonReport(raw: string): ExtractedReport {
   };
 }
 
+/** Normalise a stated date to YYYY-MM-DD; returns null when unusable. */
+export function normaliseDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const text = String(raw).trim();
+  const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  // Australian reports use DD/MM/YYYY (or DD-MM-YY).
+  const dmy = text.match(/^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})/);
+  if (dmy) {
+    const year = dmy[3].length === 2 ? `20${dmy[3]}` : dmy[3];
+    return `${year}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  }
+  return null;
+}
+
+/**
+ * Deterministic deduplication: Claude extracts every result instance it can see,
+ * this keeps only the most recent dated row per analyte (undated rows lose to
+ * dated ones, and the first undated row wins if nothing is dated).
+ */
+export function latestPerTest(
+  tests: ExtractedTest[],
+  keyOf: (name: string) => string = normaliseName,
+): ExtractedTest[] {
+  const best = new Map<string, { test: ExtractedTest; date: string | null; order: number }>();
+  tests.forEach((test, order) => {
+    if (!test?.test_name || test.value === undefined || test.value === null) return;
+    const key = keyOf(String(test.test_name));
+    const date = normaliseDate(test.date);
+    const current = best.get(key);
+    if (!current) {
+      best.set(key, { test: { ...test, date }, date, order });
+      return;
+    }
+    const wins =
+      date !== null && (current.date === null || date > current.date);
+    if (wins) best.set(key, { test: { ...test, date }, date, order });
+  });
+  return [...best.values()].sort((a, b) => a.order - b.order).map((entry) => entry.test);
+}
+
+/** Newest date across all extracted result instances. */
+export function latestDate(tests: ExtractedTest[]): string | null {
+  return tests.reduce<string | null>((acc, test) => {
+    const date = normaliseDate(test?.date);
+    return date && (!acc || date > acc) ? date : acc;
+  }, null);
+}
+
+
+
 export function normaliseName(name: string): string {
   return name
     .toLowerCase()
