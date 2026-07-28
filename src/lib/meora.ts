@@ -407,13 +407,31 @@ export function markerDirection(r: FlatResult): "high" | "low" | null {
   return null;
 }
 
+/**
+ * Direction used to trigger protocols. Trusts the reporting lab: when a lab has
+ * explicitly called a marker normal we do not escalate a marginal deviation from
+ * the longevity-optimal window into a protocol. Reports without flags (some
+ * uploads) still fall back to the optimal-range comparison.
+ */
+export function protocolDirection(r: FlatResult): "high" | "low" | null {
+  const flag = (r.flag ?? "").trim().toLowerCase();
+  if (flag === "high" || flag === "low") return flag;
+  if (flag) return null;
+  return markerDirection(r);
+}
+
 function findFlagged(results: FlatResult[], needles: string[], flag: "high" | "low") {
   return results.find((r) => {
-    if (markerDirection(r) !== flag) return false;
+    if (protocolDirection(r) !== flag) return false;
     const name = r.test_name.toLowerCase();
     return needles.some((n) => name.includes(n));
   });
 }
+
+function isFemale(patient: Patient): boolean {
+  return (patient.sex ?? "").trim().toUpperCase().startsWith("F");
+}
+
 
 interface CompositeTrigger {
   needles: string[];
@@ -427,10 +445,165 @@ interface CompositeRule {
   minHits: number;
   supersedes: string[];
   triggers: CompositeTrigger[];
+  /** Every group listed here must contribute at least one hit for the rule to fire. */
+  requires?: CompositeTrigger[][];
+  /** Restricts the rule to a biological sex when the protocol is sex-specific. */
+  sex?: "M" | "F";
   note: string;
 }
 
+const T = {
+  testosterone: { needles: ["testosterone"], direction: "low" } as CompositeTrigger,
+  fai: { needles: ["free androgen", "fai"], direction: "low" } as CompositeTrigger,
+  shbg: { needles: ["shbg", "sex hormone binding"], direction: "high" } as CompositeTrigger,
+  crp: { needles: ["crp", "c-reactive"], direction: "high" } as CompositeTrigger,
+  omega3: { needles: ["omega-3", "omega 3", "epa", "dha"], direction: "low" } as CompositeTrigger,
+  glycaemic: {
+    needles: ["insulin", "hba1c", "glucose", "homa"],
+    direction: "high",
+  } as CompositeTrigger,
+  triglycerides: { needles: ["triglyceride"], direction: "high" } as CompositeTrigger,
+  atherogenic: {
+    needles: ["ldl", "non-hdl", "apolipoprotein b", "apob", "chol/hdl"],
+    direction: "high",
+  } as CompositeTrigger,
+  lpa: { needles: ["lipoprotein (a)", "lipoprotein(a)", "lp(a)"], direction: "high" } as CompositeTrigger,
+  liver: { needles: ["alt", "ggt", "gamma gt", "ast"], direction: "high" } as CompositeTrigger,
+  leptin: { needles: ["leptin"], direction: "high" } as CompositeTrigger,
+  hdl: { needles: ["hdl cholesterol"], direction: "low" } as CompositeTrigger,
+  homocysteine: { needles: ["homocysteine"], direction: "high" } as CompositeTrigger,
+  vitaminD: { needles: ["vitamin d", "25-oh", "25 oh"], direction: "low" } as CompositeTrigger,
+  ferritin: { needles: ["ferritin"], direction: "low" } as CompositeTrigger,
+  iron: { needles: ["iron"], direction: "low" } as CompositeTrigger,
+  b12: { needles: ["b12", "folate", "methylmalonic"], direction: "high" } as CompositeTrigger,
+  b12low: { needles: ["b12", "folate"], direction: "low" } as CompositeTrigger,
+  zinc: { needles: ["zinc"], direction: "low" } as CompositeTrigger,
+  magnesium: { needles: ["magnesium"], direction: "low" } as CompositeTrigger,
+  tpo: {
+    needles: ["thyroid peroxidase", "tpo", "thyroglobulin"],
+    direction: "high",
+  } as CompositeTrigger,
+  tsh: { needles: ["thyroid-stimulating", "tsh"], direction: "high" } as CompositeTrigger,
+  calprotectin: { needles: ["calprotectin"], direction: "high" } as CompositeTrigger,
+  zonulin: { needles: ["zonulin"], direction: "high" } as CompositeTrigger,
+  iga: { needles: ["secretory iga", "iga"], direction: "low" } as CompositeTrigger,
+  gliadin: { needles: ["gliadin"], direction: "high" } as CompositeTrigger,
+  bifido: { needles: ["bifidobacterium"], direction: "low" } as CompositeTrigger,
+  faecalibacterium: { needles: ["faecalibacterium"], direction: "low" } as CompositeTrigger,
+  butyrate: { needles: ["butyrate"], direction: "low" } as CompositeTrigger,
+  fsh: { needles: ["follicle stimulating"], direction: "high" } as CompositeTrigger,
+  lhHigh: { needles: ["luteinizing", "luteinising"], direction: "high" } as CompositeTrigger,
+  oestradiolLow: { needles: ["oestradiol", "estradiol"], direction: "low" } as CompositeTrigger,
+  progesterone: { needles: ["progesterone"], direction: "low" } as CompositeTrigger,
+  amh: { needles: ["anti-mullerian", "amh"], direction: "low" } as CompositeTrigger,
+  dheas: { needles: ["dhea"], direction: "low" } as CompositeTrigger,
+};
+
 const COMPOSITE_RULES: CompositeRule[] = [
+  {
+    name: "Gut Protocol",
+    urgency: "Priority",
+    tone: "amber",
+    minHits: 3,
+    supersedes: ["Gut Microbiome Rebalance", "Anti-Inflammatory Protocol", "Longevity"],
+    note: "Barrier integrity, immune tone and commensal diversity all point to dysbiosis with increased intestinal permeability.",
+    triggers: [
+      T.calprotectin,
+      T.zonulin,
+      T.iga,
+      T.gliadin,
+      T.bifido,
+      T.faecalibacterium,
+      T.butyrate,
+    ],
+    requires: [[T.calprotectin, T.zonulin, T.iga]],
+  },
+  {
+    name: "Metabolic + Weight",
+    urgency: "Priority",
+    tone: "amber",
+    minHits: 3,
+    supersedes: [
+      "Metabolic Reset Protocol",
+      "Lipid Optimisation Protocol",
+      "Hepatobiliary Review",
+      "Performance + Recovery",
+      "Longevity + Cardiovascular",
+      "Longevity",
+    ],
+    note: "Insulin resistance, dyslipidaemia and hepatic fat handling are tracking together — a combined metabolic and body-composition programme is indicated.",
+    triggers: [
+      T.glycaemic,
+      T.triglycerides,
+      T.atherogenic,
+      T.hdl,
+      T.liver,
+      T.leptin,
+      T.crp,
+    ],
+    requires: [
+      [T.glycaemic],
+      [T.triglycerides, T.leptin],
+      [T.atherogenic, T.hdl, T.liver],
+    ],
+  },
+  {
+    name: "Longevity + Cardiovascular",
+    urgency: "Priority",
+    tone: "amber",
+    minHits: 3,
+    supersedes: [
+      "Lipid Optimisation Protocol",
+      "Methylation Support Protocol",
+      "Nutraceutical Support — Vitamin D",
+      "Men's TRT Evaluation",
+      "TRT Evaluation",
+      "Longevity",
+      "Performance + Recovery",
+    ],
+    note: "Lipoprotein(a) plus atherogenic particle burden and androgen decline drive long-term cardiovascular and healthspan risk.",
+    triggers: [T.lpa, T.atherogenic, T.crp, T.testosterone, T.homocysteine, T.glycaemic],
+    requires: [[T.lpa]],
+  },
+  {
+    name: "Beauty + Balance",
+    urgency: "Priority",
+    tone: "amber",
+    sex: "F",
+    minHits: 3,
+    supersedes: [
+      "Iron Repletion Protocol",
+      "Methylation Support Protocol",
+      "Nutraceutical Support — Vitamin D",
+      "Thyroid Support Protocol",
+      "Thyroid Function Review",
+      "Longevity",
+    ],
+    note: "Iron, B12 and micronutrient depletion alongside autoimmune thyroid activity — skin, hair, energy and cycle stability all respond to repletion.",
+    triggers: [
+      T.ferritin,
+      T.iron,
+      T.b12,
+      T.b12low,
+      T.vitaminD,
+      T.zinc,
+      T.magnesium,
+      T.tpo,
+      T.tsh,
+    ],
+    requires: [[T.ferritin, T.iron]],
+  },
+  {
+    name: "Women's HRT Evaluation",
+    urgency: "Priority",
+    tone: "amber",
+    sex: "F",
+    minHits: 2,
+    supersedes: ["Men's TRT Evaluation", "TRT Evaluation", "Beauty + Balance"],
+    note: "Gonadotrophins are rising against falling ovarian output — a perimenopausal pattern worth formally evaluating for hormone therapy.",
+    triggers: [T.fsh, T.lhHigh, T.oestradiolLow, T.progesterone, T.amh, T.dheas],
+    requires: [[T.fsh, T.lhHigh], [T.oestradiolLow, T.progesterone, T.amh]],
+  },
   {
     name: "Performance + Recovery",
     urgency: "Priority",
@@ -438,26 +611,17 @@ const COMPOSITE_RULES: CompositeRule[] = [
     minHits: 2,
     supersedes: ["Anti-Inflammatory Protocol", "Metabolic Reset Protocol"],
     note: "Inflammation, fatty acid status and glucose handling are limiting recovery and training adaptation.",
-    triggers: [
-      { needles: ["crp", "c-reactive"], direction: "high" },
-      { needles: ["omega-3", "omega 3", "epa", "dha"], direction: "low" },
-      { needles: ["insulin", "hba1c", "glucose", "homa"], direction: "high" },
-      { needles: ["triglyceride"], direction: "high" },
-    ],
+    triggers: [T.crp, T.omega3, T.glycaemic, T.triglycerides],
   },
   {
     name: "Men's TRT Evaluation",
     urgency: "Priority",
     tone: "amber",
+    sex: "M",
     minHits: 1,
     supersedes: ["TRT Evaluation"],
     note: "Androgen status sits below optimal — confirm with a repeat morning panel before considering therapy.",
-    triggers: [
-      { needles: ["testosterone"], direction: "low" },
-      { needles: ["free androgen", "fai"], direction: "low" },
-      { needles: ["shbg", "sex hormone binding"], direction: "high" },
-      { needles: ["lh", "luteinising hormone"], direction: "low" },
-    ],
+    triggers: [T.testosterone, T.fai, T.shbg],
   },
   {
     name: "Longevity",
@@ -470,29 +634,39 @@ const COMPOSITE_RULES: CompositeRule[] = [
       "Iron Repletion Protocol",
     ],
     note: "Methylation, micronutrient and iron status all influence long-term healthspan trajectory.",
-    triggers: [
-      { needles: ["homocysteine"], direction: "high" },
-      { needles: ["vitamin d", "25-oh", "25 oh"], direction: "low" },
-      { needles: ["ferritin"], direction: "low" },
-      { needles: ["b12", "folate"], direction: "low" },
-    ],
+    triggers: [T.homocysteine, T.vitaminD, T.ferritin, T.b12low],
   },
 ];
 
-function compositeProtocols(results: FlatResult[]): {
+function compositeProtocols(
+  patient: Patient,
+  results: FlatResult[],
+): {
   protocols: Protocol[];
   superseded: Set<string>;
 } {
   const protocols: Protocol[] = [];
   const superseded = new Set<string>();
+  const female = isFemale(patient);
 
   for (const rule of COMPOSITE_RULES) {
+    if (rule.sex === "F" && !female) continue;
+    if (rule.sex === "M" && female) continue;
+
     const hits: FlatResult[] = [];
     for (const trigger of rule.triggers) {
       const hit = findFlagged(results, trigger.needles, trigger.direction);
       if (hit && !hits.includes(hit)) hits.push(hit);
     }
     if (hits.length < rule.minHits) continue;
+    if (
+      rule.requires?.some(
+        (group) => !group.some((t) => findFlagged(results, t.needles, t.direction)),
+      )
+    ) {
+      continue;
+    }
+
     rule.supersedes.forEach((n) => superseded.add(n));
     protocols.push({
       name: rule.name,
@@ -501,7 +675,7 @@ function compositeProtocols(results: FlatResult[]): {
       rationale: `${rule.note} Drivers: ${hits
         .map(
           (r) =>
-            `${r.test_name} ${markerDirection(r) === "high" ? "elevated" : "low"} at ${
+            `${r.test_name} ${protocolDirection(r) === "high" ? "elevated" : "low"} at ${
               r.result_value ?? "—"
             } ${r.unit ?? ""}`.trim(),
         )
@@ -512,8 +686,9 @@ function compositeProtocols(results: FlatResult[]): {
     });
   }
 
-  return { protocols, superseded };
+  return { protocols: protocols.filter((p) => !superseded.has(p.name)), superseded };
 }
+
 
 
 function markerLabel(names: string[]): string {
@@ -613,29 +788,13 @@ function describe(r: FlatResult, word: string): string {
 
 export function recommendedProtocols(patient: Patient, allResults: FlatResult[]): Protocol[] {
   const risk = riskLevel(patient.notes);
-  if (risk === "exclusion") {
-    return [
-      {
-        name: "Specialist Referral Required",
-        rationale: riskReason(patient.notes),
-        urgency: "Urgent",
-        tone: "red",
-      },
-    ];
-  }
+  // Exclusion and high-risk patients get the alert banner only — no protocol cards.
+  if (risk !== "none") return [];
 
   const results = latestPerTest(allResults);
   const protocols: Protocol[] = [];
 
 
-  if (risk === "high_risk") {
-    protocols.push({
-      name: "Nephrology / Specialist Referral Required",
-      rationale: riskReason(patient.notes),
-      urgency: "Urgent",
-      tone: "amber",
-    });
-  }
 
   const testosterone = findFlagged(results, ["testosterone"], "low");
   if (testosterone) {
@@ -765,8 +924,8 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
-  // Composite, patient-agnostic protocol groupings evaluated against optimal ranges.
-  const composite = compositeProtocols(results);
+  // Composite, patient-agnostic protocol groupings evaluated against flagged results.
+  const composite = compositeProtocols(patient, results);
   if (composite.protocols.length) {
     const kept = protocols.filter((p) => !composite.superseded.has(p.name));
     protocols.length = 0;
@@ -776,7 +935,7 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
   // Catch-all: never claim a clean bill of health while flags exist.
   const covered = new Set(protocols.flatMap((p) => p.rationale.toLowerCase().split(/\s+/)));
   const remainingFlagged = results.filter((r) => {
-    if (markerDirection(r) === null && (r.flag ?? "").toLowerCase() !== "abnormal") return false;
+    if (protocolDirection(r) === null && (r.flag ?? "").toLowerCase() !== "abnormal") return false;
     if (r.category === "Gut & Microbiome" && gutFlags.length >= 3) return false;
     return !covered.has(r.test_name.toLowerCase());
   });
@@ -799,20 +958,22 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
   const { planProtocols, superseded } = treatmentPlanProtocols(patient, results);
   if (planProtocols.length) {
     const kept = protocols.filter(
-      (p) => !superseded.has(p.name) && p.name !== "Maintenance Protocol",
+      (p) => !superseded.has(p.name) && p.name !== "Longevity Maintenance",
     );
     return [...planProtocols, ...kept];
   }
 
   if (protocols.length === 0) {
     protocols.push({
-      name: "Maintenance Protocol",
-      rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
+      name: "Longevity Maintenance",
+      rationale:
+        "All markers on the most recent panel sit in range — maintain current lifestyle and repeat a full panel annually.",
       urgency: "Recommended",
       tone: "green",
-      action: "Initiate",
+      action: "Continue",
     });
   }
+
 
 
 
