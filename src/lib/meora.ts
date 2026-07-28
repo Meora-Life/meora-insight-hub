@@ -669,14 +669,25 @@ export function recommendedProtocols(patient: Patient, allResults: FlatResult[])
     });
   }
 
+  const { planProtocols, superseded } = treatmentPlanProtocols(patient, results);
+  if (planProtocols.length) {
+    const kept = protocols.filter(
+      (p) => !superseded.has(p.name) && p.name !== "Maintenance Protocol",
+    );
+    return [...planProtocols, ...kept];
+  }
+
   if (protocols.length === 0) {
     protocols.push({
       name: "Maintenance Protocol",
       rationale: "No flagged biomarkers on the most recent panels — annual monitoring recommended",
       urgency: "Recommended",
       tone: "green",
+      action: "Initiate",
     });
   }
+
+
 
 
   return protocols;
