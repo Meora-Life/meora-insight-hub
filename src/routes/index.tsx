@@ -495,6 +495,41 @@ function Badge({ tone, children }: { tone: "red" | "amber" | "grey"; children: R
   );
 }
 
+function ParseProgress({ stage }: { stage: Exclude<ParseStage, null> }) {
+  const activeIndex = STAGE_STEPS.findIndex((s) => s.id === stage);
+  return (
+    <div className="rounded-xl border border-border bg-muted/60 p-5">
+      <p className="text-sm font-extrabold tracking-tight text-ink">Parsing report</p>
+      <ol className="mt-3 space-y-2">
+        {STAGE_STEPS.map((step, index) => {
+          const done = index < activeIndex;
+          const active = index === activeIndex;
+          return (
+            <li key={step.id} className="flex items-center gap-3 text-sm">
+              <span
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                  done ? "bg-optimal" : active ? "animate-pulse bg-primary" : "bg-border"
+                }`}
+              />
+              <span
+                className={
+                  done
+                    ? "text-foreground/70"
+                    : active
+                      ? "font-semibold text-ink"
+                      : "text-muted-foreground"
+                }
+              >
+                {step.label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
 function StatPill({ text, loading }: { text: string; loading: boolean }) {
   return (
     <span className="inline-flex items-center rounded-full border border-ink/15 bg-card px-5 py-2.5 text-sm font-semibold text-ink shadow-[var(--shadow-card)]">
