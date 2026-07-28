@@ -6,6 +6,8 @@ export interface ExtractedTest {
   unit: string | null;
   reference_range: string | null;
   lab_flag: string | null;
+  /** Collection date for this specific result instance, if the report states one. */
+  date: string | null;
 }
 
 export interface ExtractedReport {
