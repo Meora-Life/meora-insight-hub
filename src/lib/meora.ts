@@ -305,7 +305,7 @@ export function systemScores(
       }))
       .sort((a, b) => a.score - b.score);
 
-    if (scoped.length < 3) {
+    if (scoped.length < 1) {
       return { system, score: null, count: scoped.length, contributions };
     }
     const total = contributions.reduce((sum, c) => sum + c.score, 0);
