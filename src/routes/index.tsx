@@ -72,10 +72,15 @@ function HomePage() {
   });
   const [method, setMethod] = useState<UploadMethod>("pdf");
   const [fileName, setFileName] = useState<string>("");
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [pasted, setPasted] = useState("");
+  const [stage, setStage] = useState<ParseStage>(null);
   const [csvMatches, setCsvMatches] = useState<{ matched: string[]; unmatched: string[] } | null>(
     null,
   );
+
+  const navigate = useNavigate();
+  const parsePdf = useServerFn(parsePdfReport);
 
   const definitionNames = useMemo(() => {
     const names = new Set<string>();
@@ -104,6 +109,9 @@ function HomePage() {
 
   const createPatient = useMutation({
     mutationFn: async (): Promise<string> => {
+      if (method === "pdf" && !pdfFile) throw new Error("Select a PDF pathology report first.");
+
+      setStage("patient");
       const existingPatients = (patients.data ?? []).map((p) => p.patient_id);
       const patientId = nextId("PAT", existingPatients);
 
@@ -116,6 +124,18 @@ function HomePage() {
         notes: "Created via MeorAI upload",
       });
       if (patientError) throw new Error(patientError.message);
+
+      if (method === "pdf" && pdfFile) {
+        setStage("extracting");
+        const file_base64 = await fileToBase64(pdfFile);
+        setStage("analysing");
+        const result = await parsePdf({
+          data: { patient_id: patientId, file_name: pdfFile.name, file_base64 },
+        });
+        setStage("saving");
+        void result;
+        return patientId;
+      }
 
       const { data: subs, error: subsError } = await supabase
         .from("report_submissions")
@@ -139,9 +159,14 @@ function HomePage() {
 
       return patientId;
     },
-    onSuccess: () => {
+    onError: () => setStage(null),
+    onSuccess: (patientId) => {
+      setStage(null);
       void queryClient.invalidateQueries({ queryKey: ["patients"] });
       void queryClient.invalidateQueries({ queryKey: ["patient_summaries"] });
+      void queryClient.invalidateQueries({ queryKey: ["platform_stats"] });
+      void queryClient.invalidateQueries({ queryKey: ["flat_results", patientId] });
+      if (method === "pdf") void navigate({ to: "/results", search: { patient: patientId } });
     },
   });
 
