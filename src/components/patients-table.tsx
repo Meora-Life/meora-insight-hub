@@ -4,9 +4,10 @@ import { ChevronDown } from "lucide-react";
 import { Skeleton } from "@/components/ui-bits";
 import { formatDate, isSynthetic, patientName, riskLevel } from "@/lib/meora";
 import { describeMedication, isActiveStatus, parseTreatmentPlan } from "@/lib/treatment";
+import { notesRiskFindings, type RiskFinding } from "@/lib/risk";
 import type { Patient } from "@/lib/types";
 
-type Summary = { count: number; lastDate: string | null };
+type Summary = { count: number; lastDate: string | null; riskFindings?: RiskFinding[] };
 
 type SortKey = "name_asc" | "name_desc" | "recent" | "results";
 type FilterKey = "all" | "protocol" | "excluded" | "high_risk" | "synthetic";
@@ -76,7 +77,9 @@ export function PatientsTable({
       );
       const risk = riskLevel(p.notes);
       const summary = summaries?.get(p.patient_id);
+      const findings = [...notesRiskFindings(p.notes), ...(summary?.riskFindings ?? [])];
       return {
+        highRisk: findings.length > 0 || risk === "high_risk",
         patient: p,
         name: patientName(p),
         plan,
@@ -92,7 +95,7 @@ export function PatientsTable({
       if (filter === "all") return true;
       if (filter === "protocol") return r.activeMeds.length > 0;
       if (filter === "excluded") return r.risk === "exclusion";
-      if (filter === "high_risk") return r.risk === "high_risk";
+      if (filter === "high_risk") return r.highRisk;
       return r.synthetic;
     });
 
@@ -168,7 +171,9 @@ export function PatientsTable({
         {rows.map((r, i) => {
           const expanded = open === r.patient.patient_id;
           const protocolText =
-            r.activeMeds.length > 0
+            r.highRisk
+              ? "Specialist review required"
+              : r.activeMeds.length > 0
               ? r.activeMeds.map((m) => m.name.trim()).join(", ")
               : r.risk === "exclusion"
                 ? "Excluded from protocols"
@@ -198,8 +203,8 @@ export function PatientsTable({
                 </span>
                 <span className="text-foreground/80">{summariesPending ? "…" : r.count}</span>
                 <span className="flex flex-wrap gap-1">
+                  {r.highRisk && <StatusPill tone="red">HIGH RISK</StatusPill>}
                   {r.risk === "exclusion" && <StatusPill tone="red">Excluded</StatusPill>}
-                  {r.risk === "high_risk" && <StatusPill tone="amber">High Risk</StatusPill>}
                   {r.activeMeds.length > 0 && <StatusPill tone="green">On Protocol</StatusPill>}
                   {r.synthetic && <StatusPill tone="grey">Synthetic</StatusPill>}
                 </span>
