@@ -202,15 +202,15 @@ function HeroCard({
   return (
     <div className="mt-8 overflow-hidden rounded-xl bg-ink text-ink-foreground shadow-[var(--shadow-card)]">
       {risk !== "none" && (
-        <div
-          className={`px-8 py-4 text-sm font-semibold ${
-            risk === "exclusion" ? "bg-outofrange text-white" : "bg-suboptimal text-white"
-          }`}
-        >
+        <div className="bg-outofrange px-8 py-4 text-sm font-semibold text-white">
           {risk === "exclusion" ? "Exclusion — " : "High risk — "}
           <span className="font-medium">{riskReason(patient.notes)}</span>
+          <span className="mt-1 block font-medium">
+            No protocols are recommended. Specialist review required before any Meora programme.
+          </span>
         </div>
       )}
+
 
       <div className="grid gap-8 p-8 md:grid-cols-3 md:items-center">
         <div>
