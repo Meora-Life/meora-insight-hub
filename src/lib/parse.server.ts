@@ -90,9 +90,14 @@ export function numericValue(raw: string): number | null {
 }
 
 export function serverSupabase() {
-  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!url || !key) throw new Error("Supabase server credentials are not configured");
+  const url =
+    process.env.SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    "https://mcfsxksusaxzyvcslvnk.supabase.co";
+  const key =
+    process.env.SUPABASE_PUBLISHABLE_KEY ??
+    process.env.VITE_SUPABASE_ANON_KEY ??
+    "sb_publishable_any7wERvyFmaxX_No9_j3A_Er2ER9en";
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
