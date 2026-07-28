@@ -22,7 +22,7 @@ export function PatientSelector({
         value={value ?? ""}
         disabled={loading}
         onChange={(event) => onChange(event.target.value)}
-        className="min-w-[280px] rounded-xl border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+        className="min-w-[280px] rounded-xl border border-input bg-card pl-4 pr-10 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
       >
         <option value="" disabled>
           {loading ? "Loading patients…" : "Select a patient"}

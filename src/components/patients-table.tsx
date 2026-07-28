@@ -132,7 +132,7 @@ export function PatientsTable({
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold normal-case tracking-normal text-ink outline-none focus:border-primary"
+            className="rounded-lg border border-border bg-card pl-3 pr-9 py-1.5 text-xs font-semibold normal-case tracking-normal text-ink outline-none focus:border-primary"
           >
             {SORTS.map((s) => (
               <option key={s.id} value={s.id}>
@@ -144,7 +144,7 @@ export function PatientsTable({
       </div>
 
       <div className="mt-5 overflow-hidden rounded-xl border border-border shadow-[var(--shadow-card)]">
-        <div className="grid grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_40px] items-center gap-3 bg-ink px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-ink-foreground">
+        <div className="grid grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_28px] items-center gap-3 bg-ink pl-5 pr-6 py-3 text-[11px] font-semibold uppercase tracking-wide text-ink-foreground">
           <span>Name</span>
           <span>Age</span>
           <span>Sex</span>
@@ -191,7 +191,7 @@ export function PatientsTable({
                     setOpen(expanded ? null : r.patient.patient_id);
                   }
                 }}
-                className={`grid cursor-pointer grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_40px] items-center gap-3 px-5 py-3 text-sm transition-colors hover:bg-muted/70 ${
+                className={`grid cursor-pointer grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_28px] items-center gap-3 pl-5 pr-6 py-3 text-sm transition-colors hover:bg-muted/70 ${
                   i % 2 === 0 ? "bg-card" : "bg-background"
                 }`}
               >

@@ -176,7 +176,7 @@ function ResultsPage() {
                 submissionId: e.target.value || null,
               })
             }
-            className="min-w-[320px] rounded-xl border border-input bg-card px-4 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
+            className="min-w-[320px] rounded-xl border border-input bg-card pl-4 pr-10 py-2.5 text-sm font-medium text-foreground shadow-[var(--shadow-card)] outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 disabled:opacity-60"
           >
             <option value="">Latest result per test (all submissions)</option>
             {submissions.map((s) => (
