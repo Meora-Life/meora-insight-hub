@@ -17,12 +17,19 @@ const SummaryInput = z.object({
       }),
     )
     .max(250),
+  clinical_notes: z.string().max(6000).nullish(),
+  high_risk: z.boolean().optional(),
+  risk_reasons: z.array(z.string().max(400)).max(20).optional(),
 });
 
 export const generateHealthSummary = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => SummaryInput.parse(input))
   .handler(async ({ data }) => {
-    const prompt = buildSummaryPrompt(data.patient_name, data.results);
+    const prompt = buildSummaryPrompt(data.patient_name, data.results, {
+      clinical_notes: data.clinical_notes ?? null,
+      high_risk: data.high_risk ?? false,
+      risk_reasons: data.risk_reasons ?? [],
+    });
     const summary = await callClaude(prompt);
     return { summary };
   });
