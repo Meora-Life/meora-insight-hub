@@ -48,21 +48,72 @@ Report text:
 ${reportText.slice(0, 120_000)}`;
 }
 
-export function parseJsonReport(raw: string): ExtractedReport {
-  const cleaned = raw
+export const PARSE_FAILURE_MESSAGE =
+  "Report could not be parsed automatically — please use Manual Paste";
+
+function stripFences(raw: string): string {
+  return raw
     .trim()
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/, "")
+    .replace(/^```[a-z]*\s*/i, "")
+    .replace(/```\s*$/, "")
     .trim();
+}
+
+/** Salvage individual well-formed test objects from a truncated/malformed array. */
+function salvageTests(text: string): ExtractedTest[] {
+  const tests: ExtractedTest[] = [];
+  const objectPattern = /\{[^{}]*"test_name"[^{}]*\}/g;
+  for (const match of text.match(objectPattern) ?? []) {
+    try {
+      const obj = JSON.parse(match) as Partial<ExtractedTest>;
+      if (obj.test_name && obj.value !== undefined && obj.value !== null) {
+        tests.push({
+          test_name: String(obj.test_name),
+          value: String(obj.value),
+          unit: obj.unit ?? null,
+          reference_range: obj.reference_range ?? null,
+          lab_flag: obj.lab_flag ?? null,
+        });
+      }
+    } catch {
+      // skip unrecoverable fragment
+    }
+  }
+  return tests;
+}
+
+function scalar(text: string, key: string): string | null {
+  const match = text.match(new RegExp(`"${key}"\\s*:\\s*"([^"]*)"`));
+  return match ? match[1] : null;
+}
+
+export function parseJsonReport(raw: string): ExtractedReport {
+  const cleaned = stripFences(raw);
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("Claude did not return JSON");
-  const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Partial<ExtractedReport>;
+
+  if (start !== -1 && end !== -1) {
+    try {
+      const parsed = JSON.parse(cleaned.slice(start, end + 1)) as Partial<ExtractedReport>;
+      return {
+        lab_name: parsed.lab_name ?? null,
+        report_type: parsed.report_type ?? null,
+        date_collected: parsed.date_collected ?? null,
+        tests: Array.isArray(parsed.tests) ? parsed.tests : [],
+      };
+    } catch {
+      // fall through to salvage
+    }
+  }
+
+  const tests = salvageTests(cleaned);
+  if (tests.length === 0) throw new Error(PARSE_FAILURE_MESSAGE);
+
   return {
-    lab_name: parsed.lab_name ?? null,
-    report_type: parsed.report_type ?? null,
-    date_collected: parsed.date_collected ?? null,
-    tests: Array.isArray(parsed.tests) ? parsed.tests : [],
+    lab_name: scalar(cleaned, "lab_name"),
+    report_type: scalar(cleaned, "report_type"),
+    date_collected: scalar(cleaned, "date_collected"),
+    tests,
   };
 }
 
