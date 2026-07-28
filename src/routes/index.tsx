@@ -14,6 +14,10 @@ import {
   testDefinitionsQuery,
 } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
+import { TreatmentPlanEditor } from "@/components/treatment-plan-editor";
+import { describeMedication, isActiveStatus, parseTreatmentPlan } from "@/lib/treatment";
+import type { Patient } from "@/lib/types";
+
 import { formatDate, isSynthetic, patientName, riskLevel } from "@/lib/meora";
 
 export const Route = createFileRoute("/")({
