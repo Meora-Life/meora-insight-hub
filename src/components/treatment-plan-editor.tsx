@@ -156,7 +156,7 @@ export function TreatmentPlanEditor({
                   </Field>
                   <Field label="Prescribing status">
                     <select
-                      className={input}
+                      className={`${input} pr-10`}
                       value={med.status}
                       onChange={(e) => updateMed(index, { status: e.target.value })}
                     >

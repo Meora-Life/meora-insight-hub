@@ -304,7 +304,7 @@ function HomePage() {
                   <select
                     value={form.sex}
                     onChange={(e) => setForm({ ...form, sex: e.target.value === "F" ? "F" : "M" })}
-                    className={inputClass}
+                    className={`${inputClass} pr-10`}
                   >
                     <option value="M">M</option>
                     <option value="F">F</option>
