@@ -222,11 +222,11 @@ function HomePage() {
       <section className="mx-auto max-w-7xl px-6 pb-4 pt-16 md:pt-24">
         <div className="max-w-3xl">
           <h1 className="font-display text-5xl font-semibold leading-[1.05] tracking-tight text-ink md:text-6xl">
-            Know your biology. <span className="text-primary">Own your future.</span>
+            Built by science. It starts with <span className="text-primary">Me</span>.
           </h1>
           <p className="mt-6 max-w-2xl text-lg leading-relaxed text-foreground/80">
-            MeorAI analyses your blood tests, hormones, and biomarkers to build a complete picture
-            of your health — and what to do about it.
+            MeorAI reads your pathology, maps your biology, and builds a personalised protocol
+            &mdash; powered by Claude AI. (MeorAI coming soon.)
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <StatPill
