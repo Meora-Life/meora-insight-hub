@@ -1,23 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import logoDark from "@/assets/meora-life-logo.png.asset.json";
+import logoLight from "@/assets/meora-life-logo-light.png.asset.json";
 
 export function Logomark({ size = 34, dark = false }: { size?: number; dark?: boolean }) {
   return (
-    <span
-      aria-hidden="true"
-      className="inline-flex shrink-0 items-center justify-center rounded-[10px] font-display leading-none"
-      style={{
-        width: size,
-        height: size,
-        backgroundColor: dark ? "var(--cream)" : "var(--ink)",
-        color: dark ? "var(--ink)" : "var(--cream)",
-        fontSize: size * 0.55,
-        fontWeight: 600,
-        letterSpacing: "-0.02em",
-      }}
-    >
-      M
-    </span>
+    <img
+      src={dark ? logoLight.url : logoDark.url}
+      alt="Meora.life"
+      style={{ height: size }}
+      className="w-auto shrink-0"
+    />
   );
 }
 
@@ -25,9 +18,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 bg-ink text-ink-foreground">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link to="/" className="flex items-center gap-3">
-          <Logomark dark />
-          <span className="text-[1.05rem] font-extrabold tracking-tight">MeorAI</span>
+        <Link to="/" className="flex items-center">
+          <Logomark dark size={28} />
         </Link>
         <nav className="flex items-center gap-1 text-sm font-medium">
           <HeaderLink to="/">Home</HeaderLink>

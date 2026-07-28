@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, type FormEvent } from "react";
 import { unlockSite } from "@/lib/gate.functions";
+import logoDark from "@/assets/meora-life-logo.png.asset.json";
 
 export const Route = createFileRoute("/unlock")({
   head: () => ({
@@ -50,9 +51,8 @@ function UnlockPage() {
       <div
         className={`flex w-full max-w-xl flex-col items-center text-center ${shake ? "animate-shake" : ""}`}
       >
-        <p className="font-display text-6xl font-semibold tracking-tight text-ink">
-          Meora<span className="text-primary">.</span>life
-        </p>
+        <img src={logoDark.url} alt="Meora.life" className="h-16 w-auto" />
+
         <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           powered by
         </p>
