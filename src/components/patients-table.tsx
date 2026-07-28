@@ -144,7 +144,7 @@ export function PatientsTable({
       </div>
 
       <div className="mt-5 overflow-hidden rounded-xl border border-border shadow-[var(--shadow-card)]">
-        <div className="grid grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_40px] items-center gap-3 bg-ink px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-ink-foreground">
+        <div className="grid grid-cols-[minmax(140px,2fr)_56px_64px_130px_84px_minmax(120px,1.1fr)_minmax(150px,1.4fr)_28px] items-center gap-3 bg-ink pl-5 pr-6 py-3 text-[11px] font-semibold uppercase tracking-wide text-ink-foreground">
           <span>Name</span>
           <span>Age</span>
           <span>Sex</span>
