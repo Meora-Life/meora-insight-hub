@@ -15,6 +15,7 @@ import {
 } from "@/lib/queries";
 import { supabase } from "@/lib/supabase";
 import { TreatmentPlanEditor } from "@/components/treatment-plan-editor";
+import { PatientsTable } from "@/components/patients-table";
 import { describeMedication, isActiveStatus, parseTreatmentPlan } from "@/lib/treatment";
 import type { Patient } from "@/lib/types";
 
